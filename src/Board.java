@@ -1,18 +1,8 @@
 import java.util.ArrayList;
 
-// IMPORTANT: Il ne faut pas changer la signature des méthodes
-// de cette classe, ni le nom de la classe.
-// Vous pouvez par contre ajouter d'autres méthodes (ça devrait 
-// être le cas)
 class Board {
     private Mark[][] board;
     private int size;
-
-    // Ne pas changer la signature de cette méthode
-    public Board() {
-        this(3);
-    
-    }
 
     public Board(int n) {
         this.size = n;
@@ -24,10 +14,32 @@ class Board {
         }
     }
 
-    // Place la pièce 'mark' sur le plateau, à la
-    // position spécifiée dans Move
-    //
-    // Ne pas changer la signature de cette méthode
+    public Board(int n, byte[] boardConfig){
+        this(n);
+
+        String s = new String(boardConfig).trim();
+        String[] boardValues = s.split(" ");
+        int x=0,y=0;
+
+        for (int i = 0; i < boardValues.length; i++){
+            board[x][y] = Integer.parseInt(boardValues[i]) == 2 ? Mark.B : Mark.R;
+            x++;
+            if(x == 8){
+                x = 0;
+                y++;
+            }
+        }
+    }
+
+    public Board(Board b) {
+        this.size = b.size;
+        this.board = new Mark[b.size][b.size];
+
+        for (int row = 0; row < b.size; row++) {
+            System.arraycopy(b.board[row], 0, board[row], 0, b.size);
+        }
+    }
+
     public void play(Move m, Mark mark){
         int row = m.getRow();
         int col = m.getCol();
@@ -45,12 +57,8 @@ class Board {
         board[row][col] = mark;
     }
 
-    // retourne  100 pour une victoire
-    //          -100 pour une défaite
-    //           0   pour un match nul
-    // Ne pas changer la signature de cette méthode
     public int evaluate(Mark mark){
-        Mark opponent = (mark == Mark.X) ? Mark.O : Mark.X;
+        Mark opponent = (mark == Mark.R) ? Mark.B : Mark.R;
         if (hasWon(mark)) {
             return 100;
         }
@@ -60,7 +68,6 @@ class Board {
         return 0;
     }
     
-    // Check si un certain mark a gagné
     private boolean hasWon(Mark player) {
         // rows
         for (int i = 0; i < size; i++) {
@@ -139,7 +146,7 @@ class Board {
         for (int row = 0; row < size; row++){
             for (int col = 0; col < size; col++){
                 if (board[row][col] == Mark.EMPTY)
-                    empty.add(new Move(row, col));
+                    empty.add(new Move(new byte[] {-1, -1}, new byte[] {-1, -1}, Mark.UNKNOWN)); // TODO remplacer cette méthode
             }
         }
         return empty;
@@ -150,6 +157,6 @@ class Board {
     }
 
     public boolean isGameOver() {
-        return hasWon(Mark.X) || hasWon(Mark.O) || getEmptySpaces().isEmpty();
+        return hasWon(Mark.R) || hasWon(Mark.B) || getEmptySpaces().isEmpty();
     }
 }

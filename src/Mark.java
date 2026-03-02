@@ -1,5 +1,6 @@
 enum Mark{
-        X,
-        O,
-        EMPTY
-    }
+    R,
+    B,
+    EMPTY,
+    UNKNOWN
+}

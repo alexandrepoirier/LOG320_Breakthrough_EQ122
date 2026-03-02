@@ -1,35 +1,34 @@
 import java.util.ArrayList;
 
-// IMPORTANT: Il ne faut pas changer la signature des méthodes
-// de cette classe, ni le nom de la classe.
-// Vous pouvez par contre ajouter d'autres méthodes (ça devrait 
-// être le cas)
 class CPUPlayer
 {
     private Mark cpuMark;
     private Mark opponentMark;
 
-    // Contient le nombre de noeuds visités (le nombre
-    // d'appel à la fonction MinMax ou Alpha Beta)
-    // Normalement, la variable devrait être incrémentée
-    // au début de votre MinMax ou Alpha Beta.
     private int numExploredNodes;
 
-    // Le constructeur reçoit en paramètre le
-    // joueur MAX (X ou O)
     public CPUPlayer(Mark cpu){
         this.cpuMark = cpu;
-        this.opponentMark = (cpu == Mark.X) ? Mark.O : Mark.X;
+        this.opponentMark = (cpu == Mark.R) ? Mark.B : Mark.R;
     }
 
-    // Ne pas changer cette méthode
     public int  getNumOfExploredNodes(){
         return numExploredNodes;
     }
 
-    // Retourne la liste des coups possibles.  Cette liste contient
-    // plusieurs coups possibles si et seuleument si plusieurs coups
-    // ont le même score.
+    public Mark getCpuMark(){
+        return cpuMark;
+    }
+
+    public Mark getOpponentMark(){
+        return opponentMark;
+    }
+
+    public Move getBestMove(Board board){
+        // generate all possible moves and pick best!
+        return new Move(new byte[]{-1, -1}, new byte[] {-1, -1}, cpuMark);
+    }
+
     public ArrayList<Move> getNextMoveMinMax(Board board)
     {
         numExploredNodes = 0;
@@ -94,9 +93,6 @@ class CPUPlayer
         }
     }
 
-    // Retourne la liste des coups possibles.  Cette liste contient
-    // plusieurs coups possibles si et seuleument si plusieurs coups
-    // ont le même score.
     public ArrayList<Move> getNextMoveAB(Board board){
         numExploredNodes = 0;
         ArrayList<Move> bestMoves = new ArrayList<Move>();

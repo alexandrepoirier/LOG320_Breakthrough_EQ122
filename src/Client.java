@@ -3,121 +3,186 @@ import java.net.*;
 
 
 class Client {
+	private static String host = "localhost";
+	private static int port = 8888;
+	private static Socket MyClient;
+	private static BufferedInputStream input;
+	private static BufferedOutputStream output;
+	private static BufferedReader console;
+
+	private static Board board;
+	private static CPUPlayer TheDominator;
+	private static boolean gameOver = false;
+
+	public static boolean DEBUG_MODE = false;
+	public static PlayMode PLAY_MODE = PlayMode.CPU;
+
 	public static void main(String[] args) {
-         
-	Socket MyClient;
-	BufferedInputStream input;
-	BufferedOutputStream output;
-    	int[][] board = new int[8][8];
-	
-	try {
-		MyClient = new Socket("localhost", 8888);
+		Initiliaze(args);
 
-	   	input    = new BufferedInputStream(MyClient.getInputStream());
-		output   = new BufferedOutputStream(MyClient.getOutputStream());
-		BufferedReader console = new BufferedReader(new InputStreamReader(System.in));
-	   	while(1 == 1){
-			char cmd = 0;
-		   	
-            cmd = (char)input.read();
-            System.out.println(cmd);
-            // Debut de la partie en joueur blanc
-            if(cmd == '1'){
-                byte[] aBuffer = new byte[1024];
-				
-		    int size = input.available();
-		    //System.out.println("size " + size);
-		    input.read(aBuffer,0,size);
-            String s = new String(aBuffer).trim();
-            System.out.println(s);
-            String[] boardValues;
-            boardValues = s.split(" ");
-                int x=0,y=0;
-                for(int i=0; i<boardValues.length;i++){
-                    board[x][y] = Integer.parseInt(boardValues[i]);
-                    x++;
-                    if(x == 8){
-                        x = 0;
-                        y++;
-                    }
-                }
+        try {
+			MyClient = new Socket(host, port);
+			input    = new BufferedInputStream(MyClient.getInputStream());
+			output   = new BufferedOutputStream(MyClient.getOutputStream());
+			console = new BufferedReader(new InputStreamReader(System.in));
+			char cmd;
 
-                System.out.println("Nouvelle partie! Vous jouer blanc, entrez votre premier coup : ");
-                String move = null;
-                move = console.readLine();
-				output.write(move.getBytes(),0,move.length());
-				output.flush();
-            }
-            // Debut de la partie en joueur Noir
-            if(cmd == '2'){
-                System.out.println("Nouvelle partie! Vous jouer noir, attendez le coup des blancs");
-                byte[] aBuffer = new byte[1024];
-				
-				int size = input.available();
-				//System.out.println("size " + size);
-				input.read(aBuffer,0,size);
-                String s = new String(aBuffer).trim();
-                System.out.println(s);
-                String[] boardValues;
-                boardValues = s.split(" ");
-                int x=0,y=0;
-                for(int i=0; i<boardValues.length;i++){
-                    board[x][y] = Integer.parseInt(boardValues[i]);
-                    x++;
-                    if(x == 8){
-                        x = 0;
-                        y++;
-                    }
-                }
-            }
+			while(!gameOver){
+				cmd = (char)input.read();
 
+				if (DEBUG_MODE) {
+					System.out.println("Command received : " + cmd);
+				}
 
-			// Le serveur demande le prochain coup
-			// Le message contient aussi le dernier coup joue.
-	    if(cmd == '3'){
-		byte[] aBuffer = new byte[16];
-				
-		int size = input.available();
-		System.out.println("size :" + size);
-		input.read(aBuffer,0,size);
-				
-		String s = new String(aBuffer);
-		System.out.println("Dernier coup :"+ s);
-		System.out.println("Entrez votre coup : ");
-		String move = null;
-		move = console.readLine();
-		output.write(move.getBytes(),0,move.length());
-		output.flush();
-				
-	     }
-			// Le dernier coup est invalide
-			if(cmd == '4'){
-				System.out.println("Coup invalide, entrez un nouveau coup : ");
-		       		String move = null;
-				move = console.readLine();
-				output.write(move.getBytes(),0,move.length());
-				output.flush();
-				
+				switch (cmd){
+					case '0':
+						System.exit(0);
+					case '1':
+						BeginGameAsRed();
+						break;
+					case '2':
+						BeginGameAsBlack();
+						break;
+					case '3':
+						if (ValidateOpponentMove())
+							Play();
+						break;
+					case '4':
+						PlayAgain();
+						break;
+					case '5':
+						GameOver();
+						break;
+				}
 			}
-            // La partie est terminée
-	    if(cmd == '5'){
-                byte[] aBuffer = new byte[16];
-                int size = input.available();
-                input.read(aBuffer,0,size);
-		String s = new String(aBuffer);
-		System.out.println("Partie Terminé. Le dernier coup joué est: "+s);
-		String move = null;
-		move = console.readLine();
-		output.write(move.getBytes(),0,move.length());
-		output.flush();
-				
-	    }
-        }
-	}
-	catch (IOException e) {
-   		System.out.println(e);
-	}
-	
-    }
-}
+		}
+		catch (IOException e) {
+			System.out.println(e.getMessage());
+		}
 
+		try{
+			while(MyClient.isConnected()){
+				Thread.sleep(500);
+			}
+		}catch (InterruptedException e){
+			// do nothing
+		}
+    }
+
+	private static void Initiliaze(String[] args) {
+		// Parse args for command line arguments
+		for (String arg : args) {
+			if (arg.charAt(0) == '-'){
+				String[] argument = arg.substring(1).toLowerCase().split(":");
+
+				switch (argument[0]) {
+					case "debug":
+						DEBUG_MODE = true;
+						if (DEBUG_MODE) System.out.println("DEBUG MODE ON");
+						break;
+					case "mode":
+						if (argument.length > 1 && argument[1].equals("cpu")){
+							PLAY_MODE = PlayMode.CPU;
+							if (DEBUG_MODE) System.out.println("Play Mode: CPU");
+						}else if (argument.length > 1 && argument[1].equals("manual")){
+							PLAY_MODE = PlayMode.MANUAL;
+							if (DEBUG_MODE) System.out.println("Play Mode: MANUAL");
+						}else{
+							System.err.println("'mode' flag was not set : no mode was specified");
+						}
+						break;
+				}
+			}
+		}
+	}
+
+	// Implémentation des commandes
+
+	public static void BeginGameAsRed() throws IOException {
+		byte[] buffer = new byte[1024];
+		input.read(buffer,0, input.available());
+		board = new Board(8, buffer);
+		TheDominator = new CPUPlayer(Mark.R);
+		System.out.println("Nouvelle partie! Vous jouez rouge.");
+		Play();
+	}
+
+	public static void BeginGameAsBlack() throws IOException{
+		byte[] buffer = new byte[1024];
+		input.read(buffer,0, input.available());
+		board = new Board(8, buffer);
+		TheDominator = new CPUPlayer(Mark.B);
+		System.out.println("Nouvelle partie! Vous jouez noir, attendez le coup des rouges...");
+	}
+
+	public static void Play() throws IOException{
+		switch (PLAY_MODE){
+			case CPU:
+				PlayCPU();
+				break;
+			case MANUAL:
+				PlayManual();
+				break;
+		}
+	}
+
+	private static void PlayCPU() throws IOException{
+		System.out.println("The computer is computing...");
+		Move newMove = TheDominator.getBestMove(board);
+		String  newMoveStr = newMove.toString();
+		System.out.println("The computer plays : " + newMove);
+		output.write(newMoveStr.getBytes(),0,newMoveStr.length());
+		output.flush();
+	}
+
+	private static void PlayManual() throws IOException {
+		Move newMove = null;
+
+		while (newMove == null) {
+			try{
+				System.out.print("Entrez votre coup : ");
+				newMove = new Move(console.readLine(), TheDominator.getCpuMark());
+			}catch (InvalidMoveException e){
+				if (DEBUG_MODE) System.err.println(e.getMessage());
+				System.out.println("Invalid move, try again. ");
+			}
+		}
+
+		String newMoveStr = newMove.toString();
+		System.out.println("Playing : " + newMoveStr);
+		output.write(newMoveStr.getBytes(),0,newMoveStr.length());
+		output.flush();
+	}
+
+	private static void PlayAgain() throws IOException{
+		System.out.println("Votre coup précédent était invalide.");
+		Play();
+	}
+
+	public static boolean ValidateOpponentMove() throws IOException {
+		byte[] buffer = new byte[16];
+		input.read(buffer,0, input.available());
+		String s = new String(buffer);
+		String[] parts = s.split("-");
+		Move opponentMove;
+
+		try{
+			opponentMove = new Move(parts[0].trim() + parts[1].trim(), TheDominator.getOpponentMark());
+		}catch (InvalidMoveException e){
+			if(DEBUG_MODE) System.err.println("Invalid opponent move : " + e.getMessage());
+			output.write("4".getBytes(),0,1);
+			output.flush();
+			return false;
+		}
+
+		return true;
+	}
+
+	private static void GameOver() {
+		gameOver = true;
+		if (DEBUG_MODE){
+			System.out.println("Partie terminée.");
+			System.out.println("Waiting for server connection to terminate...");
+		}
+	}
+}

@@ -3,6 +3,7 @@ class Move
     private byte[] start;
     private byte[] end;
     private final Mark player;
+    private Mark moveTo;
 
     /**
      * Both 'start' and 'end' are arrays of size 2 with [col, row] indexes
@@ -37,8 +38,8 @@ class Move
 
     private void setMoveInternal(char[] start, char[] end) throws InvalidMoveException{
         if (Client.DEBUG_MODE) System.out.println(String.format("Called : setMove(%c%c, %c%c)", start[0], start[1], end[0], end[1]));
-        this.start = new byte[] {(byte)(start[0] - 65), (byte)(start[1] - 48)};
-        this.end = new byte[] {(byte)(end[0] - 65), (byte)(end[1] - 48)};
+        this.start = new byte[] {(byte)(start[0] - 65), (byte)(7-(start[1] - 49))};
+        this.end = new byte[] {(byte)(end[0] - 65), (byte)(7-(end[1] - 49))};
         validateMoveInternal();
     }
 
@@ -58,8 +59,8 @@ class Move
         // 2) A piece has to move in at least one direction
         // 3) Blacks can only move down, Reds can only move up
         if ( Math.abs(start[0] - end[0]) > 1
-                || (player == Mark.R && (end[1] - start[1]) != 1)
-                || (player == Mark.B && (end[1] - start[1]) != -1)
+                || (player == Mark.B && (end[1] - start[1]) != 1)
+                || (player == Mark.R && (end[1] - start[1]) != -1)
                 || (start[0] - end[0] == 0 && start[1] - end[1] == 0)){
             throw new InvalidMoveException("Move direction is wrong");
         }
@@ -69,10 +70,10 @@ class Move
         StringBuilder sb = new StringBuilder();
 
         sb.append((char)(start[0]+65));
-        sb.append((char)(start[1] + 48));
+        sb.append((char)(7-start[1] + 49));
         sb.append("-");
         sb.append((char)(end[0]+65));
-        sb.append((char)(end[1] + 48));
+        sb.append((char)(7-end[1] + 49));
 
         return sb.toString();
     }
@@ -86,6 +87,9 @@ class Move
     public byte getStartCol() { return start[0]; }
     public byte getEndRow() { return end[1]; }
     public byte getEndCol() { return end[0]; }
+    public Mark getPlayer() { return player; }
+    public void setMoveTo(Mark moveTo) { this.moveTo = moveTo; }
+    public Mark getMoveTo() { return moveTo; }
 }
 
 class InvalidMoveException extends Exception

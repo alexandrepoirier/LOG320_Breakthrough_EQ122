@@ -1,4 +1,5 @@
 import java.util.ArrayList;
+import java.util.Collection;
 
 class CPUPlayer
 {
@@ -24,9 +25,76 @@ class CPUPlayer
         return opponentMark;
     }
 
+    public ArrayList<Move> getPossibleMoves(Board board, Mark mark){
+        ArrayList<Move> possibleMoves = new ArrayList<>();
+        if(mark == Mark.R){
+            possibleMoves = getPossibleRedMoves(board);
+        } else if (mark == Mark.B) {
+            possibleMoves = getPossibleBlackMoves(board);
+        }
+        return possibleMoves;
+    }
+
+    private ArrayList<Move> getPossibleBlackMoves(Board board) {
+        ArrayList<Move> possibleMoves = new ArrayList<>();
+        for (int col = 0; col < 8; col++) {
+            for (int row = 0; row < 8; row++) {
+                if (board.getBoard()[col][row] == Mark.B){
+                    possibleMoves.addAll(getBlackMove(board,col,row));
+                }
+            }
+        }
+        return possibleMoves;
+    }
+
+    private ArrayList<Move> getBlackMove(Board board,int col,int row) {
+        ArrayList<Move> possibleMoves = new ArrayList<>();
+        if(row < 7 && row >= 0){
+            if(col - 1 >=0 && board.getBoard()[col-1][row+1] != Mark.B){
+                possibleMoves.add(new Move(new byte[]{(byte)col, (byte)row}, new byte[] {(byte)(col-1), (byte)(row+1)}, cpuMark));
+            }
+            if(board.getBoard()[col][row+1] == Mark.EMPTY){
+                possibleMoves.add(new Move(new byte[]{(byte)col, (byte)row}, new byte[] {(byte)(col), (byte)(row+1)}, cpuMark));
+            }
+            if(col+1 <= 7 &&board.getBoard()[col+1][row+1] != Mark.B){
+                possibleMoves.add(new Move(new byte[]{(byte)col, (byte)row}, new byte[] {(byte)(col+1), (byte)(row+1)}, cpuMark));
+            }
+        }
+        return possibleMoves;
+    }
+
+    private ArrayList<Move> getPossibleRedMoves(Board board) {
+        ArrayList<Move> possibleMoves = new ArrayList<>();
+        for (int col = 0; col < 8; col++) {
+            for (int row = 0; row < 8; row++) {
+                if (board.getBoard()[col][row] == Mark.R){
+                    possibleMoves.addAll(getRedMove(board, col, row));
+                }
+            }
+        }
+        return possibleMoves;
+    }
+
+    private ArrayList<Move> getRedMove(Board board, int col,int row) {
+        ArrayList<Move> possibleMoves = new ArrayList<>();
+        if(row <= 7 && row > 0){
+            if(col - 1 >=0 && board.getBoard()[col-1][row-1] != Mark.R){
+                possibleMoves.add(new Move(new byte[]{(byte)col, (byte)row}, new byte[] {(byte)(col-1), (byte)(row-1)}, cpuMark));
+            }
+            if(board.getBoard()[col][row-1] == Mark.EMPTY){
+                possibleMoves.add(new Move(new byte[]{(byte)col, (byte)row}, new byte[] {(byte)(col), (byte)(row-1)}, cpuMark));
+            }
+            if(col+1 <= 7 &&board.getBoard()[col+1][row-1] != Mark.R){
+                possibleMoves.add(new Move(new byte[]{(byte)col, (byte)row}, new byte[] {(byte)(col+1), (byte)(row-1)}, cpuMark));
+            }
+        }
+        return possibleMoves;
+    }
+
     public Move getBestMove(Board board){
         // generate all possible moves and pick best!
-        return new Move(new byte[]{-1, -1}, new byte[] {-1, -1}, cpuMark);
+        Board copyBoard = new Board(board);
+        return getNextMoveMinMax(copyBoard).getFirst();
     }
 
     public ArrayList<Move> getNextMoveMinMax(Board board)
@@ -35,15 +103,15 @@ class CPUPlayer
         ArrayList<Move> bestMoves = new ArrayList<Move>();
         int bestScore = Integer.MIN_VALUE;
         
-        ArrayList<Move> possibleMoves = board.getEmptySpaces();
+        ArrayList<Move> possibleMoves = getPossibleMoves(board,cpuMark);
         
         System.out.println("\nMinMax: Evaluation des moves ppossibles");
         for (Move move : possibleMoves) {
             board.play(move, cpuMark);
-            int score = minMax(board, false);
+            int score = minMax(board, false, 0);
             board.undoMove(move);
             
-            System.out.println("Move (" + move.getRow() + ", " + move.getCol() + ") -> Score: " + score);
+            System.out.println("Move (" + move.getEndCol() + ", " + move.getEndRow() + ") -> Score: " + score);
             
             if (score > bestScore) {
                 bestScore = score;
@@ -56,36 +124,43 @@ class CPUPlayer
         System.out.println("Meilleur score: " + bestScore);
         System.out.print("Meilleurs moves: ");
         for (Move m : bestMoves) {
-            System.out.print("(" + m.getRow() + ", " + m.getCol() + ") ");
+            System.out.print("(" + m.getEndCol() + ", " + m.getEndRow() + ") ");
         }
         System.out.println();
         
         return bestMoves;
     }
 
-    private int minMax(Board board, boolean isMaximizing) {
+    private int minMax(Board board, boolean isMaximizing, int depth) {
         numExploredNodes++;
-        
-        if (board.isGameOver()) {
-            return board.evaluate(cpuMark);
+
+        int boardVal = board.evaluate(cpuMark);
+        if (boardVal == 100){
+            return boardVal - depth;
         }
-        
-        ArrayList<Move> possibleMoves = board.getEmptySpaces();
-        
+        if (boardVal == -100){
+            return boardVal + depth;
+        }
+        if (board.isGameOver()) {
+            return boardVal;
+        }
+
         if (isMaximizing) {
+            ArrayList<Move> possibleMoves = getPossibleMoves(board,cpuMark);
             int maxScore = Integer.MIN_VALUE;
             for (Move move : possibleMoves) {
                 board.play(move, cpuMark);
-                int score = minMax(board, false);
+                int score = minMax(board, false, depth+1);
                 board.undoMove(move);
                 maxScore = Math.max(maxScore, score);
             }
             return maxScore;
         } else {
+            ArrayList<Move> possibleMoves = getPossibleMoves(board,opponentMark);
             int minScore = Integer.MAX_VALUE;
             for (Move move : possibleMoves) {
                 board.play(move, opponentMark);
-                int score = minMax(board, true);
+                int score = minMax(board, true, depth+1);
                 board.undoMove(move);
                 minScore = Math.min(minScore, score);
             }
@@ -100,7 +175,7 @@ class CPUPlayer
         int alpha = Integer.MIN_VALUE;
         int beta = Integer.MAX_VALUE;
         
-        ArrayList<Move> possibleMoves = board.getEmptySpaces();
+        ArrayList<Move> possibleMoves = getPossibleMoves(board,cpuMark);
         
         System.out.println("\n=== Alpha-Beta: Evaluation des moves ===");
         for (Move move : possibleMoves) {
@@ -108,7 +183,7 @@ class CPUPlayer
             int score = alphaBeta(board, false, alpha, beta);
             board.undoMove(move);
             
-            System.out.println("Move (" + move.getRow() + ", " + move.getCol() + ") -> Score: " + score + " [alpha=" + alpha + ", beta=" + beta + "]");
+            System.out.println("Move (" + move.getEndCol() + ", " + move.getEndRow() + ") -> Score: " + score + " [alpha=" + alpha + ", beta=" + beta + "]");
             
             if (score > bestScore) {
                 bestScore = score;
@@ -123,7 +198,7 @@ class CPUPlayer
         System.out.println("Meilleur score: " + bestScore);
         System.out.print("Meilleurs moves: ");
         for (Move m : bestMoves) {
-            System.out.print("(" + m.getRow() + ", " + m.getCol() + ") ");
+            System.out.print("(" + m.getEndCol() + ", " + m.getEndRow() + ") ");
         }
         System.out.println();
         
@@ -138,9 +213,8 @@ class CPUPlayer
             return board.evaluate(cpuMark);
         }
         
-        ArrayList<Move> possibleMoves = board.getEmptySpaces();
-        
         if (isMaximizing) {
+            ArrayList<Move> possibleMoves = getPossibleMoves(board,cpuMark);
             int maxScore = Integer.MIN_VALUE;
             for (Move move : possibleMoves) {
                 board.play(move, cpuMark);
@@ -154,6 +228,7 @@ class CPUPlayer
             }
             return maxScore;
         } else {
+            ArrayList<Move> possibleMoves = getPossibleMoves(board,opponentMark);
             int minScore = Integer.MAX_VALUE;
             for (Move move : possibleMoves) {
                 board.play(move, opponentMark);

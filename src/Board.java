@@ -22,7 +22,8 @@ class Board {
         int x=0,y=0;
 
         for (int i = 0; i < boardValues.length; i++){
-            board[x][y] = Integer.parseInt(boardValues[i]) == 2 ? Mark.B : Mark.R;
+            board[x][y] = Integer.parseInt(boardValues[i]) == 2 ? Mark.B : Integer.parseInt(boardValues[i]) == 4 ? Mark.R : Mark.EMPTY;
+
             x++;
             if(x == 8){
                 x = 0;
@@ -41,20 +42,17 @@ class Board {
     }
 
     public void play(Move m, Mark mark){
-        int row = m.getRow();
-        int col = m.getCol();
+        int row = m.getEndRow();
+        int col = m.getEndCol();
         
         // position is valid?
         if (row < 0 || row >= size || col < 0 || col >= size) {
-            throw new IllegalArgumentException("Invalid position: (" + row + ", " + col + ")");
+            throw new IllegalArgumentException("Invalid position: (" + col + ", " + row + ")");
         }
-        
-        // position is empty?
-        if (board[row][col] != Mark.EMPTY) {
-            throw new IllegalStateException("Position (" + row + ", " + col + ") est déjà occupé par " + board[row][col]);
-        }
-        
-        board[row][col] = mark;
+
+        m.setMoveTo(board[col][row]);
+        board[col][row] = mark;
+        board[m.getStartCol()][m.getStartRow()] = Mark.EMPTY;
     }
 
     public int evaluate(Mark mark){
@@ -153,10 +151,15 @@ class Board {
     }
 
     public void undoMove(Move m) {
-        board[m.getRow()][m.getCol()] = Mark.EMPTY;
+        board[m.getEndCol()][m.getEndRow()] = m.getMoveTo();
+        board[m.getStartCol()][m.getStartRow()] = m.getPlayer();
     }
 
     public boolean isGameOver() {
         return hasWon(Mark.R) || hasWon(Mark.B) || getEmptySpaces().isEmpty();
+    }
+
+    public Mark[][] getBoard() {
+        return board;
     }
 }

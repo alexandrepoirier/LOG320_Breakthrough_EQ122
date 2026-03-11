@@ -129,6 +129,7 @@ class Client {
 	private static void PlayCPU() throws IOException{
 		System.out.println("The computer is computing...");
 		Move newMove = TheDominator.getBestMove(board);
+        board.play(newMove,TheDominator.getCpuMark());
 		String  newMoveStr = newMove.toString();
 		System.out.println("The computer plays : " + newMove);
 		output.write(newMoveStr.getBytes(),0,newMoveStr.length());
@@ -168,6 +169,7 @@ class Client {
 
 		try{
 			opponentMove = new Move(parts[0].trim() + parts[1].trim(), TheDominator.getOpponentMark());
+            board.play(opponentMove,TheDominator.getOpponentMark());
 		}catch (InvalidMoveException e){
 			if(DEBUG_MODE) System.err.println("Invalid opponent move : " + e.getMessage());
 			output.write("4".getBytes(),0,1);

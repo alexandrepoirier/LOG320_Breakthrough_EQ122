@@ -51,13 +51,13 @@ class CPUPlayer
         ArrayList<Move> possibleMoves = new ArrayList<>();
         if(row < 7 && row >= 0){
             if(col - 1 >=0 && board.getBoard()[col-1][row+1] != Mark.B){
-                possibleMoves.add(new Move(new byte[]{(byte)col, (byte)row}, new byte[] {(byte)(col-1), (byte)(row+1)}, cpuMark));
+                possibleMoves.add(new Move(new byte[]{(byte)col, (byte)row}, new byte[] {(byte)(col-1), (byte)(row+1)}, Mark.B));
             }
             if(board.getBoard()[col][row+1] == Mark.EMPTY){
-                possibleMoves.add(new Move(new byte[]{(byte)col, (byte)row}, new byte[] {(byte)(col), (byte)(row+1)}, cpuMark));
+                possibleMoves.add(new Move(new byte[]{(byte)col, (byte)row}, new byte[] {(byte)(col), (byte)(row+1)}, Mark.B));
             }
             if(col+1 <= 7 &&board.getBoard()[col+1][row+1] != Mark.B){
-                possibleMoves.add(new Move(new byte[]{(byte)col, (byte)row}, new byte[] {(byte)(col+1), (byte)(row+1)}, cpuMark));
+                possibleMoves.add(new Move(new byte[]{(byte)col, (byte)row}, new byte[] {(byte)(col+1), (byte)(row+1)}, Mark.B));
             }
         }
         return possibleMoves;
@@ -79,13 +79,13 @@ class CPUPlayer
         ArrayList<Move> possibleMoves = new ArrayList<>();
         if(row <= 7 && row > 0){
             if(col - 1 >=0 && board.getBoard()[col-1][row-1] != Mark.R){
-                possibleMoves.add(new Move(new byte[]{(byte)col, (byte)row}, new byte[] {(byte)(col-1), (byte)(row-1)}, cpuMark));
+                possibleMoves.add(new Move(new byte[]{(byte)col, (byte)row}, new byte[] {(byte)(col-1), (byte)(row-1)}, Mark.R));
             }
             if(board.getBoard()[col][row-1] == Mark.EMPTY){
-                possibleMoves.add(new Move(new byte[]{(byte)col, (byte)row}, new byte[] {(byte)(col), (byte)(row-1)}, cpuMark));
+                possibleMoves.add(new Move(new byte[]{(byte)col, (byte)row}, new byte[] {(byte)(col), (byte)(row-1)}, Mark.R));
             }
             if(col+1 <= 7 &&board.getBoard()[col+1][row-1] != Mark.R){
-                possibleMoves.add(new Move(new byte[]{(byte)col, (byte)row}, new byte[] {(byte)(col+1), (byte)(row-1)}, cpuMark));
+                possibleMoves.add(new Move(new byte[]{(byte)col, (byte)row}, new byte[] {(byte)(col+1), (byte)(row-1)}, Mark.R));
             }
         }
         return possibleMoves;
@@ -105,14 +105,11 @@ class CPUPlayer
         
         ArrayList<Move> possibleMoves = getPossibleMoves(board,cpuMark);
         
-        System.out.println("\nMinMax: Evaluation des moves ppossibles");
         for (Move move : possibleMoves) {
             board.play(move, cpuMark);
             int score = minMax(board, false, 0);
             board.undoMove(move);
-            
-            System.out.println("Move (" + move.getEndCol() + ", " + move.getEndRow() + ") -> Score: " + score);
-            
+
             if (score > bestScore) {
                 bestScore = score;
                 bestMoves.clear();
@@ -121,13 +118,6 @@ class CPUPlayer
                 bestMoves.add(move);
             }
         }
-        System.out.println("Meilleur score: " + bestScore);
-        System.out.print("Meilleurs moves: ");
-        for (Move m : bestMoves) {
-            System.out.print("(" + m.getEndCol() + ", " + m.getEndRow() + ") ");
-        }
-        System.out.println();
-        
         return bestMoves;
     }
 
@@ -135,14 +125,11 @@ class CPUPlayer
         numExploredNodes++;
 
         int boardVal = board.evaluate(cpuMark);
-        if (boardVal == 100){
+        if (boardVal == Integer.MAX_VALUE){
             return boardVal - depth;
         }
-        if (boardVal == -100){
+        if (boardVal == Integer.MIN_VALUE){
             return boardVal + depth;
-        }
-        if (board.isGameOver()) {
-            return boardVal;
         }
 
         if (isMaximizing) {
@@ -177,14 +164,11 @@ class CPUPlayer
         
         ArrayList<Move> possibleMoves = getPossibleMoves(board,cpuMark);
         
-        System.out.println("\n=== Alpha-Beta: Evaluation des moves ===");
         for (Move move : possibleMoves) {
             board.play(move, cpuMark);
             int score = alphaBeta(board, false, 0, alpha, beta);
             board.undoMove(move);
-            
-            System.out.println("Move (" + move.getEndCol() + ", " + move.getEndRow() + ") -> Score: " + score + " [alpha=" + alpha + ", beta=" + beta + "]");
-            
+
             if (score > bestScore) {
                 bestScore = score;
                 bestMoves.clear();
@@ -195,12 +179,6 @@ class CPUPlayer
             
             alpha = Math.max(alpha, bestScore);
         }
-        System.out.println("Meilleur score: " + bestScore);
-        System.out.print("Meilleurs moves: ");
-        for (Move m : bestMoves) {
-            System.out.print("(" + m.getEndCol() + ", " + m.getEndRow() + ") ");
-        }
-        System.out.println();
         
         return bestMoves;
     }
@@ -209,14 +187,11 @@ class CPUPlayer
         numExploredNodes++;
 
         int boardVal = board.evaluate(cpuMark);
-        if (boardVal == 100){
+        if (boardVal == Integer.MAX_VALUE){
             return boardVal - depth;
         }
-        if (boardVal == -100){
+        if (boardVal == Integer.MIN_VALUE){
             return boardVal + depth;
-        }
-        if (board.isGameOver()) {
-            return boardVal;
         }
         
         if (isMaximizing) {

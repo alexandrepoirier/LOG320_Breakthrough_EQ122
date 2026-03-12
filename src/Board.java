@@ -1,5 +1,3 @@
-import java.util.ArrayList;
-
 class Board {
     private Mark[][] board;
     private int size;
@@ -41,122 +39,66 @@ class Board {
         }
     }
 
-    public void play(Move m, Mark mark){
-        int row = m.getEndRow();
-        int col = m.getEndCol();
-        
-        // position is valid?
-        if (row < 0 || row >= size || col < 0 || col >= size) {
-            throw new IllegalArgumentException("Invalid position: (" + col + ", " + row + ")");
-        }
-
-        m.setMoveTo(board[col][row]);
-        board[col][row] = mark;
-        board[m.getStartCol()][m.getStartRow()] = Mark.EMPTY;
-    }
-
     public int evaluate(Mark mark){
         Mark opponent = (mark == Mark.R) ? Mark.B : Mark.R;
         if (hasWon(mark)) {
-            return 100;
+            return Integer.MAX_VALUE;
         }
         if (hasWon(opponent)) {
-            return -100;
+            return Integer.MIN_VALUE;
         }
         return 0;
     }
     
     private boolean hasWon(Mark player) {
-        // rows
-        for (int i = 0; i < size; i++) {
-            boolean rowWin = true;
-            for (int j = 0; j < size; j++) {
-                if (board[i][j] != player) {
-                    rowWin = false;
-                    break;
+        if(player == Mark.R){
+            for(int col = 0; col < size; col++){
+                if(board[col][0] == Mark.R){
+                    return true;
                 }
             }
-            if (rowWin) return true;
-        }
-        
-        // colonne
-        for (int j = 0; j < size; j++) {
-            boolean colWin = true;
-            for (int i = 0; i < size; i++) {
-                if (board[i][j] != player) {
-                    colWin = false;
-                    break;
+            boolean noMoreBlack = true;
+            for(int col = 0; col < size; col++){
+                for(int row = 0; row < size; row++){
+                    if(board[row][col] == Mark.R){
+                        noMoreBlack = false;
+                    }
                 }
             }
-            if (colWin) return true;
-        }
-        
-        // diag top gauche @ bas droite
-        boolean diagWin = true;
-        for (int i = 0; i < size; i++) {
-            if (board[i][i] != player) {
-                diagWin = false;
-                break;
+            if(noMoreBlack){
+                return true;
             }
         }
-        if (diagWin) return true;
-        
-        // diag top droit @ bas gauche
-        boolean antiDiagWin = true;
-        for (int i = 0; i < size; i++) {
-            if (board[i][size - 1 - i] != player) {
-                antiDiagWin = false;
-                break;
+        if(player == Mark.B){
+            for(int col = 0; col < size; col++){
+                if(board[col][7] == Mark.B){
+                    return true;
+                }
+            }
+            boolean noMoreRed = true;
+            for(int col = 0; col < size; col++){
+                for(int row = 0; row < size; row++){
+                    if(board[row][col] == Mark.R){
+                        noMoreRed = false;
+                    }
+                }
+            }
+            if(noMoreRed){
+                return true;
             }
         }
-        if (antiDiagWin) return true;
-        
         return false;
     }
 
-    // Display the board
-    public void displayBoard() {
-        System.out.println();
-        for (int i = 0; i < size; i++) {
-            for (int j = 0; j < size; j++) {
-                String symbol = (board[i][j] == Mark.EMPTY) ? " " : board[i][j].toString();
-                System.out.print(" " + symbol + " ");
-                if (j < size - 1) {
-                    System.out.print("|");
-                }
-            }
-            System.out.println();
-            if (i < size - 1) {
-                for (int j = 0; j < size; j++) {
-                    System.out.print("---");
-                    if (j < size - 1) {
-                        System.out.print("+");
-                    }
-                }
-                System.out.println();
-            }
-        }
-        System.out.println();
-    }
-
-    public ArrayList<Move> getEmptySpaces(){
-        ArrayList<Move> empty = new ArrayList<Move>();
-        for (int row = 0; row < size; row++){
-            for (int col = 0; col < size; col++){
-                if (board[row][col] == Mark.EMPTY)
-                    empty.add(new Move(new byte[] {-1, -1}, new byte[] {-1, -1}, Mark.UNKNOWN)); // TODO remplacer cette méthode
-            }
-        }
-        return empty;
+    public void play(Move m, Mark mark){
+        m.setMoveTo(board[m.getEndCol()][m.getEndRow()]);
+        board[m.getEndCol()][m.getEndRow()] = mark;
+        board[m.getStartCol()][m.getStartRow()] = Mark.EMPTY;
     }
 
     public void undoMove(Move m) {
         board[m.getEndCol()][m.getEndRow()] = m.getMoveTo();
         board[m.getStartCol()][m.getStartRow()] = m.getPlayer();
-    }
-
-    public boolean isGameOver() {
-        return hasWon(Mark.R) || hasWon(Mark.B) || getEmptySpaces().isEmpty();
     }
 
     public Mark[][] getBoard() {

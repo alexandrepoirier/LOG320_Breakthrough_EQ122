@@ -78,11 +78,6 @@ class Move
         return sb.toString();
     }
 
-    public int getRow() { return -1; } // TODO doit être enlevé
-    public int getCol() { return -1; } // TODO doit être enlevé
-
-    public byte[] getStart() { return start; }
-    public byte[] getEnd() { return end; }
     public byte getStartRow() { return start[1]; }
     public byte getStartCol() { return start[0]; }
     public byte getEndRow() { return end[1]; }

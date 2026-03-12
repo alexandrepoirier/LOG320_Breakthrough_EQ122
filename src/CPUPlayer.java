@@ -94,7 +94,7 @@ class CPUPlayer
     public Move getBestMove(Board board){
         // generate all possible moves and pick best!
         Board copyBoard = new Board(board);
-        return getNextMoveMinMax(copyBoard).getFirst();
+        return getNextMoveAB(copyBoard).getFirst();
     }
 
     public ArrayList<Move> getNextMoveMinMax(Board board)
@@ -180,7 +180,7 @@ class CPUPlayer
         System.out.println("\n=== Alpha-Beta: Evaluation des moves ===");
         for (Move move : possibleMoves) {
             board.play(move, cpuMark);
-            int score = alphaBeta(board, false, alpha, beta);
+            int score = alphaBeta(board, false, 0, alpha, beta);
             board.undoMove(move);
             
             System.out.println("Move (" + move.getEndCol() + ", " + move.getEndRow() + ") -> Score: " + score + " [alpha=" + alpha + ", beta=" + beta + "]");
@@ -205,7 +205,7 @@ class CPUPlayer
         return bestMoves;
     }
 
-    private int alphaBeta(Board board, boolean isMaximizing, int alpha, int beta) {
+    private int alphaBeta(Board board, boolean isMaximizing, int depth,int alpha, int beta) {
         numExploredNodes++;
         
         // Terminal state check
@@ -218,7 +218,7 @@ class CPUPlayer
             int maxScore = Integer.MIN_VALUE;
             for (Move move : possibleMoves) {
                 board.play(move, cpuMark);
-                int score = alphaBeta(board, false, alpha, beta);
+                int score = alphaBeta(board, false, depth+1, alpha, beta);
                 board.undoMove(move);
                 maxScore = Math.max(maxScore, score);
                 alpha = Math.max(alpha, maxScore);
@@ -232,7 +232,7 @@ class CPUPlayer
             int minScore = Integer.MAX_VALUE;
             for (Move move : possibleMoves) {
                 board.play(move, opponentMark);
-                int score = alphaBeta(board, true, alpha, beta);
+                int score = alphaBeta(board, true, depth+1, alpha, beta);
                 board.undoMove(move);
                 minScore = Math.min(minScore, score);
                 beta = Math.min(beta, minScore);

@@ -4,6 +4,8 @@ class Move
     private byte[] end;
     private final Mark player;
     private Mark moveTo;
+    private boolean isCapture;
+    private boolean isWinning;
 
     public Move(byte[] start, byte[] end, Mark player) {
         this.start = start;
@@ -77,6 +79,12 @@ class Move
     public Mark getPlayer() { return player; }
     public void setMoveTo(Mark moveTo) { this.moveTo = moveTo; }
     public Mark getMoveTo() { return moveTo; }
+
+    public void setCapture(boolean capture) { this.isCapture = capture; }
+    public boolean isCapture() { return isCapture; }
+
+    public void setWinning(boolean winning) { this.isWinning = winning; }
+    public boolean isWinning() { return isWinning; }
 }
 
 class InvalidMoveException extends Exception

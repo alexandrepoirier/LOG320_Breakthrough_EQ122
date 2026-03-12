@@ -41,36 +41,83 @@ class Board {
 
     public int evaluate(Mark mark){
         Mark opponent = (mark == Mark.R) ? Mark.B : Mark.R;
-        if (hasWon(mark)) {
-            return Integer.MAX_VALUE;
-        }
-        if (hasWon(opponent)) {
-            return Integer.MIN_VALUE;
-        }
+        if (hasWon(mark)) return Integer.MAX_VALUE;
+        if (hasWon(opponent)) return Integer.MIN_VALUE;
         
-        // Heuristique temporaire selon la position
         int score = 0;
         
+        // Poids
+        final int P_PIECE = 20;
+        final int P_AVANCE = 5;
+        final int P_MENACE = -30;
+        final int P_PROTEGE = 10;
+        final int P_MOBILITE = 1;
+
         for(int col = 0; col < size; col++){
             for(int row = 0; row < size; row++){
-                if(board[col][row] == mark){
-                    // Reward pieces closer to opponent's goal
-                    if(mark == Mark.R){
-                        score += 10 + (7 - row) * 5; // Closer to row 0 is better for Red
-                    } else {
-                        score += 10 + row * 5; // Closer to row 7 is better for Black
-                    }
-                } else if(board[col][row] == opponent){
-                    if(mark == Mark.R){
-                        score -= 10 + row * 5;
-                    } else {
-                        score -= 10 + (7 - row) * 5;
-                    }
+                Mark cell = board[col][row];
+                if(cell == Mark.EMPTY) continue;
+                
+                int val = 0;
+                
+                // 1. Avancement (Quadratique pour encourager la fin)
+                if (cell == Mark.R) {
+                    int av = (7 - row);
+                    val += P_PIECE + (av * av * P_AVANCE);
+                } else {
+                    int av = row;
+                    val += P_PIECE + (av * av * P_AVANCE);
                 }
+
+                // 2. Sécurité
+                if (estMenace(col, row, cell)) val += P_MENACE;
+                if (estProtege(col, row, cell)) val += P_PROTEGE;
+                
+                // 3. Mobilité
+                val += compteMobilite(col, row, cell) * P_MOBILITE;
+
+                score += (cell == mark) ? val : -val;
             }
         }
         
         return score;
+    }
+    
+    private boolean estMenace(int col, int row, Mark moi) {
+        Mark ennemi = (moi == Mark.R) ? Mark.B : Mark.R;
+        // L'ennemi attaque depuis 'devant' lui.
+        // Si je suis R (va vers 0), l'ennemi B (va vers 7) est en row-1.
+        int rowSrcEnnemi = (moi == Mark.R) ? row - 1 : row + 1;
+        
+        if (rowSrcEnnemi < 0 || rowSrcEnnemi >= size) return false;
+        
+        if (col > 0 && board[col-1][rowSrcEnnemi] == ennemi) return true;
+        if (col < size-1 && board[col+1][rowSrcEnnemi] == ennemi) return true;
+        return false;
+    }
+    
+    private boolean estProtege(int col, int row, Mark moi) {
+        // Ami derrière moi
+        int rowAmi = (moi == Mark.R) ? row + 1 : row - 1;
+        
+        if (rowAmi < 0 || rowAmi >= size) return false;
+        
+        if (col > 0 && board[col-1][rowAmi] == moi) return true;
+        if (col < size-1 && board[col+1][rowAmi] == moi) return true;
+        return false;
+    }
+
+    private int compteMobilite(int col, int row, Mark moi) {
+        int mob = 0;
+        int rowDest = (moi == Mark.R) ? row - 1 : row + 1;
+        
+        if (rowDest < 0 || rowDest >= size) return 0;
+        
+        if (board[col][rowDest] == Mark.EMPTY) mob++;
+        if (col > 0 && board[col-1][rowDest] != moi) mob++; // Manger ou bouger
+        if (col < size-1 && board[col+1][rowDest] != moi) mob++;
+        
+        return mob;
     }
     
     private boolean hasWon(Mark player) {

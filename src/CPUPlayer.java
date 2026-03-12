@@ -7,6 +7,8 @@ class CPUPlayer
     private Mark opponentMark;
 
     private int numExploredNodes;
+    private long searchStartTime;
+    private static final long TIME_LIMIT_MS = 4800;
 
     public CPUPlayer(Mark cpu){
         this.cpuMark = cpu;
@@ -23,6 +25,10 @@ class CPUPlayer
 
     public Mark getOpponentMark(){
         return opponentMark;
+    }
+
+    private boolean isTimeUp() {
+        return (System.currentTimeMillis() - searchStartTime) >= TIME_LIMIT_MS;
     }
 
     public ArrayList<Move> getPossibleMoves(Board board, Mark mark){
@@ -157,34 +163,75 @@ class CPUPlayer
 
     public ArrayList<Move> getNextMoveAB(Board board){
         numExploredNodes = 0;
-        ArrayList<Move> bestMoves = new ArrayList<Move>();
-        int bestScore = Integer.MIN_VALUE;
-        int alpha = Integer.MIN_VALUE;
-        int beta = Integer.MAX_VALUE;
+        searchStartTime = System.currentTimeMillis();
         
+        ArrayList<Move> bestMoves = new ArrayList<Move>();
         ArrayList<Move> possibleMoves = getPossibleMoves(board,cpuMark);
         
-        for (Move move : possibleMoves) {
-            board.play(move, cpuMark);
-            int score = alphaBeta(board, false, 0, alpha, beta);
-            board.undoMove(move);
+        if (possibleMoves.isEmpty()) {
+            return bestMoves;
+        }
 
-            if (score > bestScore) {
-                bestScore = score;
-                bestMoves.clear();
-                bestMoves.add(move);
-            } else if (score == bestScore) {
-                bestMoves.add(move);
+        int currentDepth = 1;
+        int maxDepthReached = 0;
+        
+        while (!isTimeUp()) {
+            ArrayList<Move> currentBestMoves = new ArrayList<Move>();
+            int bestScore = Integer.MIN_VALUE;
+            int alpha = Integer.MIN_VALUE;
+            int beta = Integer.MAX_VALUE;
+            boolean completedDepth = true;
+            
+            for (Move move : possibleMoves) {
+                if (isTimeUp()) {
+                    completedDepth = false;
+                    break;
+                }
+                board.play(move, cpuMark);
+                int score = alphaBeta(board, false, 0, alpha, beta, currentDepth);
+                board.undoMove(move);
+
+                if (score > bestScore) {
+                    bestScore = score;
+                    currentBestMoves.clear();
+                    currentBestMoves.add(move);
+                } else if (score == bestScore) {
+                    currentBestMoves.add(move);
+                }
+                
+                alpha = Math.max(alpha, bestScore);
+            }
+
+            if (completedDepth && !currentBestMoves.isEmpty()) {
+                bestMoves = currentBestMoves;
+                maxDepthReached = currentDepth;
+                
+                // Arreeter si on a un move gangnant
+                if (bestScore >= Integer.MAX_VALUE - 1000) {
+                    break;
+                }
+            } else {
+                // no more timees :(
+                break;
             }
             
-            alpha = Math.max(alpha, bestScore);
+            currentDepth++;
+        }
+        
+        // Si y'a aucun move (technicalement pas possible)
+        if (bestMoves.isEmpty() && !possibleMoves.isEmpty()) {
+            bestMoves.add(possibleMoves.getFirst());
         }
         
         return bestMoves;
     }
 
-    private int alphaBeta(Board board, boolean isMaximizing, int depth,int alpha, int beta) {
+    private int alphaBeta(Board board, boolean isMaximizing, int depth, int alpha, int beta, int maxDepth) {
         numExploredNodes++;
+
+        if (isTimeUp()) {
+            return 0;
+        }
 
         int boardVal = board.evaluate(cpuMark);
         if (boardVal == Integer.MAX_VALUE){
@@ -194,12 +241,23 @@ class CPUPlayer
             return boardVal + depth;
         }
         
+        // reached le max depth
+        if (depth >= maxDepth) {
+            return boardVal;
+        }
+        
         if (isMaximizing) {
             ArrayList<Move> possibleMoves = getPossibleMoves(board,cpuMark);
+            if (possibleMoves.isEmpty()) {
+                return Integer.MIN_VALUE + depth;
+            }
             int maxScore = Integer.MIN_VALUE;
             for (Move move : possibleMoves) {
+                if (isTimeUp()) {
+                    break;
+                }
                 board.play(move, cpuMark);
-                int score = alphaBeta(board, false, depth+1, alpha, beta);
+                int score = alphaBeta(board, false, depth+1, alpha, beta, maxDepth);
                 board.undoMove(move);
                 maxScore = Math.max(maxScore, score);
                 alpha = Math.max(alpha, maxScore);
@@ -210,10 +268,16 @@ class CPUPlayer
             return maxScore;
         } else {
             ArrayList<Move> possibleMoves = getPossibleMoves(board,opponentMark);
+            if (possibleMoves.isEmpty()) {
+                return Integer.MAX_VALUE - depth;
+            }
             int minScore = Integer.MAX_VALUE;
             for (Move move : possibleMoves) {
+                if (isTimeUp()) {
+                    break;
+                }
                 board.play(move, opponentMark);
-                int score = alphaBeta(board, true, depth+1, alpha, beta);
+                int score = alphaBeta(board, true, depth+1, alpha, beta, maxDepth);
                 board.undoMove(move);
                 minScore = Math.min(minScore, score);
                 beta = Math.min(beta, minScore);

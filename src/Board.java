@@ -47,7 +47,30 @@ class Board {
         if (hasWon(opponent)) {
             return Integer.MIN_VALUE;
         }
-        return 0;
+        
+        // Heuristique temporaire selon la position
+        int score = 0;
+        
+        for(int col = 0; col < size; col++){
+            for(int row = 0; row < size; row++){
+                if(board[col][row] == mark){
+                    // Reward pieces closer to opponent's goal
+                    if(mark == Mark.R){
+                        score += 10 + (7 - row) * 5; // Closer to row 0 is better for Red
+                    } else {
+                        score += 10 + row * 5; // Closer to row 7 is better for Black
+                    }
+                } else if(board[col][row] == opponent){
+                    if(mark == Mark.R){
+                        score -= 10 + row * 5;
+                    } else {
+                        score -= 10 + (7 - row) * 5;
+                    }
+                }
+            }
+        }
+        
+        return score;
     }
     
     private boolean hasWon(Mark player) {
@@ -60,10 +83,12 @@ class Board {
             boolean noMoreBlack = true;
             for(int col = 0; col < size; col++){
                 for(int row = 0; row < size; row++){
-                    if(board[row][col] == Mark.R){
+                    if(board[col][row] == Mark.B){
                         noMoreBlack = false;
+                        break;
                     }
                 }
+                if(!noMoreBlack) break;
             }
             if(noMoreBlack){
                 return true;
@@ -78,10 +103,12 @@ class Board {
             boolean noMoreRed = true;
             for(int col = 0; col < size; col++){
                 for(int row = 0; row < size; row++){
-                    if(board[row][col] == Mark.R){
+                    if(board[col][row] == Mark.R){
                         noMoreRed = false;
+                        break;
                     }
                 }
+                if(!noMoreRed) break;
             }
             if(noMoreRed){
                 return true;

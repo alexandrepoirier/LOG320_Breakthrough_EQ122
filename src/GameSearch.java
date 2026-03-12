@@ -9,7 +9,10 @@ class GameSearch {
     private Mark opponentMark;
     private int numExploredNodes;
     private long searchStartTime;
-    private static final long TIME_LIMIT_MS = 4800;
+    private static final long TIME_LIMIT_MS = 4600;
+    
+    // creation de t able de Transposition
+    private TranspositionTable tt = new TranspositionTable();
 
     public GameSearch(Mark cpuMark, Mark opponentMark) {
         this.cpuMark = cpuMark;
@@ -31,7 +34,7 @@ class GameSearch {
         ArrayList<Move> bestMoves = new ArrayList<Move>();
         ArrayList<Move> possibleMoves = MoveGenerator.getPossibleMoves(board, cpuMark);
         
-        // Tri des coups (Move Ordering)
+        // Tri des coups (move rdering)
         sortMoves(possibleMoves);
         
         if (possibleMoves.isEmpty()) {
@@ -95,18 +98,38 @@ class GameSearch {
 
         if (isTimeUp()) return 0;
 
+        // --- Vérification Transposition Table ---
+        String key = tt.generateKey(board);
+        TranspositionTable.TTEntry entry = tt.get(key);
+        if (entry != null && entry.depth >= (maxDepth - depth)) { // Si la profondeur stockée est suffisante
+            if (entry.flag == TranspositionTable.EXACT) {
+                return entry.value;
+            } else if (entry.flag == TranspositionTable.LOWERBOUND) {
+                alpha = Math.max(alpha, entry.value);
+            } else if (entry.flag == TranspositionTable.UPPERBOUND) {
+                beta = Math.min(beta, entry.value);
+            }
+            if (alpha >= beta) {
+                return entry.value; // Coupure immédiate grâce à la TT
+            }
+        }
+        // ----------------------------------------
+
         if (globalAlpha != null) {
             alpha = Math.max(alpha, globalAlpha.get());
         }
         
         if (beta <= alpha) return alpha;
+        
+        // Sauvegarde de l'alpha initial pour déterminer le type de coupe plus tard
+        int originalAlpha = alpha;
 
         int boardVal = board.evaluate(cpuMark);
         if (boardVal == Integer.MAX_VALUE) return boardVal - depth;
         if (boardVal == Integer.MIN_VALUE) return boardVal + depth;
         
         if (depth >= maxDepth) return boardVal;
-        
+
         Mark currentMark = isMaximizing ? cpuMark : opponentMark;
         ArrayList<Move> moves = MoveGenerator.getPossibleMoves(board, currentMark);
         
@@ -140,6 +163,22 @@ class GameSearch {
 
             if (beta <= alpha) break;
         }
+        
+        // --- Stockage dans Transposition Table ---
+        if (!isTimeUp()) { // On ne stocke pas des résultats partiels interrompus par le temps
+            int flag;
+            if (bestVal <= originalAlpha) {
+                flag = TranspositionTable.UPPERBOUND; // N'a pas amélioré alpha -> on a trouvé une borne sup
+            } else if (bestVal >= beta) {
+                flag = TranspositionTable.LOWERBOUND; // A provoqué une coupe -> on a trouvé une borne inf
+            } else {
+                flag = TranspositionTable.EXACT; // Valeur exacte
+            }
+            // On stocke la profondeur "restante" explorée depuis ce nœud
+            tt.put(key, maxDepth - depth, bestVal, flag);
+        }
+        // -----------------------------------------
+        
         return bestVal;
     }
 
@@ -151,4 +190,3 @@ class GameSearch {
         });
     }
 }
-

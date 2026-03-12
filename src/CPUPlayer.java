@@ -36,4 +36,8 @@ class CPUPlayer
     public ArrayList<Move> getNextMoveAB(Board board) {
         return searchEngine.getNextMoveAB(board);
     }
+
+    public ArrayList<Move> getNextMoveMinMax(Board board) {
+        return searchEngine.getNextMoveMinMax(board);
+    }
 }

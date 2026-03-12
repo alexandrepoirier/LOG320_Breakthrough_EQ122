@@ -9,6 +9,10 @@ class MoveGenerator {
         } else if (mark == Mark.B) {
             possibleMoves = getPossibleBlackMoves(board);
         }
+        
+        // Tri des coups pour mieux profiter de notre alpha beta
+        sortMoves(possibleMoves);
+        
         return possibleMoves;
     }
 
@@ -80,7 +84,7 @@ class MoveGenerator {
                 possibleMoves.add(m);
             }
             // Diagonale droite
-            if(col+1 <= 7 &&board.getBoard()[col+1][row-1] != Mark.R){
+            if(col+1 <= 7 && board.getBoard()[col+1][row-1] != Mark.R){
                 Move m = new Move(new byte[]{(byte)col, (byte)row}, new byte[] {(byte)(col+1), (byte)(row-1)}, Mark.R);
                 if (board.getBoard()[col+1][row-1] == Mark.B) m.setCapture(true);
                 if (row-1 == 0) m.setWinning(true);
@@ -89,5 +93,12 @@ class MoveGenerator {
         }
         return possibleMoves;
     }
-}
 
+    public static void sortMoves(ArrayList<Move> moves) {
+        moves.sort((m1, m2) -> {
+            if (m1.isWinning() != m2.isWinning()) return m1.isWinning() ? -1 : 1;
+            if (m1.isCapture() != m2.isCapture()) return m1.isCapture() ? -1 : 1;
+            return 0;
+        });
+    }
+}

@@ -189,4 +189,99 @@ class GameSearch {
             return 0;
         });
     }
+
+    public ArrayList<Move> getNextMoveMinMax(Board board) {
+        numExploredNodes = 0;
+        searchStartTime = System.currentTimeMillis();
+        
+        ArrayList<Move> bestMoves = new ArrayList<Move>();
+        ArrayList<Move> possibleMoves = MoveGenerator.getPossibleMoves(board, cpuMark);
+        
+        sortMoves(possibleMoves);
+        
+        if (possibleMoves.isEmpty()) {
+            return bestMoves;
+        }
+
+        int bestScore = Integer.MIN_VALUE;
+        int currentDepth = 1;
+        
+        while (!isTimeUp()) {
+            int tempBestScore = Integer.MIN_VALUE;
+            ArrayList<Move> tempBestMoves = new ArrayList<>();
+
+            for (Move move : possibleMoves) {
+                if (isTimeUp()) break;
+                
+                Board copie = new Board(board);
+                copie.play(move, cpuMark);
+                
+                int score = minMax(copie, false, 0, currentDepth);
+                
+                if (score > tempBestScore) {
+                    tempBestScore = score;
+                    tempBestMoves.clear();
+                    tempBestMoves.add(move);
+                } else if (score == tempBestScore) {
+                    tempBestMoves.add(move);
+                }
+            }
+
+            if (!isTimeUp()) {
+                bestScore = tempBestScore;
+                bestMoves = tempBestMoves;
+                
+                if (bestScore >= Integer.MAX_VALUE - 1000) {
+                    break;
+                }
+            }
+            
+            currentDepth++;
+        }
+        
+        if (bestMoves.isEmpty() && !possibleMoves.isEmpty()) {
+            bestMoves.add(possibleMoves.getFirst());
+        }
+        
+        return bestMoves;
+    }
+
+    private int minMax(Board board, boolean isMaximizing, int depth, int maxDepth) {
+        numExploredNodes++;
+
+        if (isTimeUp()) return 0;
+
+        int boardVal = board.evaluate(cpuMark);
+        if (boardVal == Integer.MAX_VALUE) return boardVal - depth;
+        if (boardVal == Integer.MIN_VALUE) return boardVal + depth;
+        
+        if (depth >= maxDepth) return boardVal;
+
+        Mark currentMark = isMaximizing ? cpuMark : opponentMark;
+        ArrayList<Move> moves = MoveGenerator.getPossibleMoves(board, currentMark);
+        
+        sortMoves(moves);
+        
+        if (moves.isEmpty()) {
+            return isMaximizing ? (Integer.MIN_VALUE + depth) : (Integer.MAX_VALUE - depth);
+        }
+
+        int bestVal = isMaximizing ? Integer.MIN_VALUE : Integer.MAX_VALUE;
+
+        for (Move move : moves) {
+            if (isTimeUp()) break;
+
+            board.play(move, currentMark);
+            int val = minMax(board, !isMaximizing, depth+1, maxDepth);
+            board.undoMove(move);
+
+            if (isMaximizing) {
+                bestVal = Math.max(bestVal, val);
+            } else {
+                bestVal = Math.min(bestVal, val);
+            }
+        }
+        
+        return bestVal;
+    }
 }

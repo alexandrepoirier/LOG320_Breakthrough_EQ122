@@ -1,5 +1,8 @@
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.atomic.AtomicInteger;
 
 class CPUPlayer
 {
@@ -105,30 +108,34 @@ class CPUPlayer
 
     public ArrayList<Move> getNextMoveMinMax(Board board)
     {
-        numExploredNodes = 0;
-        ArrayList<Move> bestMoves = new ArrayList<Move>();
-        int bestScore = Integer.MIN_VALUE;
-        
-        ArrayList<Move> possibleMoves = getPossibleMoves(board,cpuMark);
-        
-        for (Move move : possibleMoves) {
-            board.play(move, cpuMark);
-            int score = minMax(board, false, 0);
-            board.undoMove(move);
-
-            if (score > bestScore) {
-                bestScore = score;
-                bestMoves.clear();
-                bestMoves.add(move);
-            } else if (score == bestScore) {
-                bestMoves.add(move);
-            }
+        ArrayList<Move> coupsPossibles = getPossibleMoves(board, cpuMark);
+        if (coupsPossibles.isEmpty()) {
+            numExploredNodes = 0;
+            return new ArrayList<>();
         }
-        return bestMoves;
+
+        // Profondeur fixe de 4
+        List<Callable<ParallelSearchHelper.ResultatEvaluation>> taches = new ArrayList<>();
+        for (Move coup : coupsPossibles) {
+            taches.add(() -> evaluerCoupRacineMinMax(board, coup, 4));
+        }
+
+        ParallelSearchHelper.ResultatGlobal res = ParallelSearchHelper.executerEnParallele(taches);
+        numExploredNodes = res.totalNoeuds;
+        return res.meilleursCoups;
     }
 
-    private int minMax(Board board, boolean isMaximizing, int depth) {
-        numExploredNodes++;
+    ParallelSearchHelper.ResultatEvaluation evaluerCoupRacineMinMax(Board board, Move coup, int profMax) {
+        Board copie = new Board(board);
+        copie.play(coup, cpuMark);
+        int[] compteur = new int[]{0};
+        // Adapte minMax pour prendre une profondeur max si necessaire, sinon on ignore profMax ici car minMax n'a pas ete modifie pour ca dans cette etape
+        int score = minMax(copie, false, 0, compteur, profMax);
+        return new ParallelSearchHelper.ResultatEvaluation(coup, score, compteur[0]);
+    }
+
+    private int minMax(Board board, boolean isMaximizing, int depth, int[] nodes, int maxDepth) {
+        nodes[0]++;
 
         int boardVal = board.evaluate(cpuMark);
         if (boardVal == Integer.MAX_VALUE){
@@ -138,12 +145,16 @@ class CPUPlayer
             return boardVal + depth;
         }
 
+        if (depth >= maxDepth) {
+            return boardVal;
+        }
+
         if (isMaximizing) {
             ArrayList<Move> possibleMoves = getPossibleMoves(board,cpuMark);
             int maxScore = Integer.MIN_VALUE;
             for (Move move : possibleMoves) {
                 board.play(move, cpuMark);
-                int score = minMax(board, false, depth+1);
+                int score = minMax(board, false, depth+1, nodes, maxDepth);
                 board.undoMove(move);
                 maxScore = Math.max(maxScore, score);
             }
@@ -153,7 +164,7 @@ class CPUPlayer
             int minScore = Integer.MAX_VALUE;
             for (Move move : possibleMoves) {
                 board.play(move, opponentMark);
-                int score = minMax(board, true, depth+1);
+                int score = minMax(board, true, depth+1, nodes, maxDepth);
                 board.undoMove(move);
                 minScore = Math.min(minScore, score);
             }
@@ -176,49 +187,32 @@ class CPUPlayer
         int maxDepthReached = 0;
         
         while (!isTimeUp()) {
-            ArrayList<Move> currentBestMoves = new ArrayList<Move>();
-            int bestScore = Integer.MIN_VALUE;
-            int alpha = Integer.MIN_VALUE;
-            int beta = Integer.MAX_VALUE;
-            boolean completedDepth = true;
-            
-            for (Move move : possibleMoves) {
-                if (isTimeUp()) {
-                    completedDepth = false;
-                    break;
-                }
-                board.play(move, cpuMark);
-                int score = alphaBeta(board, false, 0, alpha, beta, currentDepth);
-                board.undoMove(move);
+            List<Callable<ParallelSearchHelper.ResultatEvaluation>> taches = new ArrayList<>();
+            final int prof = currentDepth;
+            // Variable partagée pour communiquer le meilleur score trouvé entre les threads
+            AtomicInteger globalAlpha = new AtomicInteger(Integer.MIN_VALUE);
 
-                if (score > bestScore) {
-                    bestScore = score;
-                    currentBestMoves.clear();
-                    currentBestMoves.add(move);
-                } else if (score == bestScore) {
-                    currentBestMoves.add(move);
-                }
-                
-                alpha = Math.max(alpha, bestScore);
+            for (Move move : possibleMoves) {
+                taches.add(() -> evaluerCoupRacineAlphaBeta(board, move, prof, globalAlpha));
             }
 
-            if (completedDepth && !currentBestMoves.isEmpty()) {
-                bestMoves = currentBestMoves;
-                maxDepthReached = currentDepth;
-                
-                // Arreeter si on a un move gangnant
-                if (bestScore >= Integer.MAX_VALUE - 1000) {
-                    break;
-                }
-            } else {
-                // no more timees :(
+            ParallelSearchHelper.ResultatGlobal resultatDepth = ParallelSearchHelper.executerEnParallele(taches);
+
+            if (isTimeUp()) {
+                break;
+            }
+
+            bestMoves = resultatDepth.meilleursCoups;
+            maxDepthReached = currentDepth;
+            numExploredNodes += resultatDepth.totalNoeuds;
+
+            if (resultatDepth.meilleurScore >= Integer.MAX_VALUE - 1000) {
                 break;
             }
             
             currentDepth++;
         }
         
-        // Si y'a aucun move (technicalement pas possible)
         if (bestMoves.isEmpty() && !possibleMoves.isEmpty()) {
             bestMoves.add(possibleMoves.getFirst());
         }
@@ -226,11 +220,40 @@ class CPUPlayer
         return bestMoves;
     }
 
-    private int alphaBeta(Board board, boolean isMaximizing, int depth, int alpha, int beta, int maxDepth) {
-        numExploredNodes++;
+    ParallelSearchHelper.ResultatEvaluation evaluerCoupRacineAlphaBeta(Board board, Move coup, int profMax, AtomicInteger globalAlpha) {
+        Board copie = new Board(board);
+        copie.play(coup, cpuMark);
+        int[] compteur = new int[]{0};
+        // Alpha initial: on prend le maximum entre -Inf et ce que les autres threads ont déjà trouvé
+        int alphaInitial = Integer.MIN_VALUE;
+        if (globalAlpha != null) {
+            alphaInitial = Math.max(alphaInitial, globalAlpha.get());
+        }
+
+        int score = alphaBeta(copie, false, 0, alphaInitial, Integer.MAX_VALUE, profMax, compteur, globalAlpha);
+        
+        // Mettre à jour l'alpha global si on a trouvé mieux
+        if (globalAlpha != null) {
+            globalAlpha.updateAndGet(current -> Math.max(current, score));
+        }
+
+        return new ParallelSearchHelper.ResultatEvaluation(coup, score, compteur[0]);
+    }
+
+    private int alphaBeta(Board board, boolean isMaximizing, int depth, int alpha, int beta, int maxDepth, int[] nodes, AtomicInteger globalAlpha) {
+        nodes[0]++;
 
         if (isTimeUp()) {
             return 0;
+        }
+
+        // Mise à jour de alpha avec la valeur partagée globale pour élaguer plus fort
+        if (globalAlpha != null) {
+            alpha = Math.max(alpha, globalAlpha.get());
+        }
+        
+        if (beta <= alpha) {
+            return alpha; // Elagage immédiat grâce à l'info des autres threads
         }
 
         int boardVal = board.evaluate(cpuMark);
@@ -241,7 +264,6 @@ class CPUPlayer
             return boardVal + depth;
         }
         
-        // reached le max depth
         if (depth >= maxDepth) {
             return boardVal;
         }
@@ -256,11 +278,21 @@ class CPUPlayer
                 if (isTimeUp()) {
                     break;
                 }
+                
+                // Rafraîchir alpha avant chaque coup pour bénéficier des découvertes récentes
+                if (globalAlpha != null) {
+                   alpha = Math.max(alpha, globalAlpha.get());
+                   if (beta <= alpha) break;
+                }
+
                 board.play(move, cpuMark);
-                int score = alphaBeta(board, false, depth+1, alpha, beta, maxDepth);
+                int score = alphaBeta(board, false, depth+1, alpha, beta, maxDepth, nodes, globalAlpha);
                 board.undoMove(move);
                 maxScore = Math.max(maxScore, score);
                 alpha = Math.max(alpha, maxScore);
+                
+                // On ne met PAS à jour globalAlpha ici (seulement à la racine pour éviter les valeurs instables)
+                
                 if (beta <= alpha) {
                     break; 
                 }
@@ -276,8 +308,15 @@ class CPUPlayer
                 if (isTimeUp()) {
                     break;
                 }
+                
+                // Rafraîchir alpha
+                if (globalAlpha != null) {
+                   alpha = Math.max(alpha, globalAlpha.get());
+                   if (beta <= alpha) break;
+                }
+
                 board.play(move, opponentMark);
-                int score = alphaBeta(board, true, depth+1, alpha, beta, maxDepth);
+                int score = alphaBeta(board, true, depth+1, alpha, beta, maxDepth, nodes, globalAlpha);
                 board.undoMove(move);
                 minScore = Math.min(minScore, score);
                 beta = Math.min(beta, minScore);

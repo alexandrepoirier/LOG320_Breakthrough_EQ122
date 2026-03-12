@@ -2,7 +2,21 @@
 out/
 !**/src/main/**/out/
 !**/src/test/**/out/
-.idea/workspace.xml
+.idea/
+*.iml
+*.iws
+*.ipr
+
+### Compiled Java classes ###
+*.class
+
+*.jar
+!lib/*.jar
+
+### Build output ###
+out/
+target/
+build/
 
 ### Eclipse ###
 .apt_generated
@@ -28,3 +42,8 @@ bin/
 
 ### Mac OS ###
 .DS_Store
+
+### General ###
+.DS_Store
+Thumbs.db
+*.log

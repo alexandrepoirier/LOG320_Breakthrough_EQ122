@@ -17,17 +17,20 @@ class Move
     }
 
     public Move(String str, Mark player) throws InvalidMoveException{
+        this.player = player;
         if (str.length() == 4){
             try{
-                this.player = player;
                 setMoveInternal(str.substring(0, 2).toCharArray(), str.substring(2, 4).toCharArray());
+            }catch (InvalidMoveException e){
+                throw e;
             }catch (Exception e){
                 throw new InvalidMoveException();
             }
         }else if (str.length() == 5){
             try{
-                this.player = player;
                 setMoveInternal(str.split("-")[0].toCharArray(), str.split("-")[1].toCharArray());
+            }catch (InvalidMoveException e){
+                throw e;
             }catch (Exception e){
                 throw new InvalidMoveException();
             }
@@ -45,10 +48,10 @@ class Move
 
     private void validateMoveInternal() throws InvalidMoveException{
         // Validate bounds
-        if ( !(start[0] >= 0 && start[0] <= 8
-                && start[1] >= 0 && start[1] <= 8
-                && end[0] >= 0 && end[0] <= 8
-                && end[1] >= 0 && end[1] <= 8)
+        if ( !(start[0] >= 0 && start[0] < 8
+                && start[1] >= 0 && start[1] < 8
+                && end[0] >= 0 && end[0] < 8
+                && end[1] >= 0 && end[1] < 8)
         )
         {
             throw new InvalidMoveException("Move out of bounds");

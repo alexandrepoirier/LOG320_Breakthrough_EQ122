@@ -94,7 +94,7 @@ class CPUPlayer
     public Move getBestMove(Board board){
         // generate all possible moves and pick best!
         Board copyBoard = new Board(board);
-        return getNextMoveAB(copyBoard).getFirst();
+        return getNextMoveAB(copyBoard).get(0);
     }
 
     public ArrayList<Move> getNextMoveMinMax(Board board)
@@ -130,6 +130,11 @@ class CPUPlayer
         }
         if (boardVal == Integer.MIN_VALUE){
             return boardVal + depth;
+        }
+        
+        // Limite de profondeur
+        if (depth >= 3) {
+            return 0;
         }
 
         if (isMaximizing) {
@@ -192,6 +197,11 @@ class CPUPlayer
         }
         if (boardVal == Integer.MIN_VALUE){
             return boardVal + depth;
+        }
+        
+        // Limite de profondeur
+        if (depth >= 3) {
+            return 0;
         }
         
         if (isMaximizing) {

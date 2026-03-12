@@ -207,10 +207,16 @@ class CPUPlayer
 
     private int alphaBeta(Board board, boolean isMaximizing, int depth,int alpha, int beta) {
         numExploredNodes++;
-        
-        // Terminal state check
+
+        int boardVal = board.evaluate(cpuMark);
+        if (boardVal == 100){
+            return boardVal - depth;
+        }
+        if (boardVal == -100){
+            return boardVal + depth;
+        }
         if (board.isGameOver()) {
-            return board.evaluate(cpuMark);
+            return boardVal;
         }
         
         if (isMaximizing) {

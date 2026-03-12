@@ -5,11 +5,6 @@ class Move
     private final Mark player;
     private Mark moveTo;
 
-    /**
-     * Both 'start' and 'end' are arrays of size 2 with [col, row] indexes
-     * @param start Indexes of start position
-     * @param end Indexes of end position
-     */
     public Move(byte[] start, byte[] end, Mark player) {
         this.start = start;
         this.end = end;
@@ -55,9 +50,6 @@ class Move
         }
 
         // Validate move itself
-        // 1) A piece can only move by one space in any direction
-        // 2) A piece has to move in at least one direction
-        // 3) Blacks can only move down, Reds can only move up
         if ( Math.abs(start[0] - end[0]) > 1
                 || (player == Mark.B && (end[1] - start[1]) != 1)
                 || (player == Mark.R && (end[1] - start[1]) != -1)

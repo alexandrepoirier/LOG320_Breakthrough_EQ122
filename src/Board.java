@@ -1,6 +1,8 @@
 class Board {
     private Mark[][] board;
     private int size;
+    private int blackCount = 0;
+    private int redCount = 0;
 
     public Board(int n) {
         this.size = n;
@@ -20,7 +22,17 @@ class Board {
         int x=0,y=0;
 
         for (int i = 0; i < boardValues.length; i++){
-            board[x][y] = Integer.parseInt(boardValues[i]) == 2 ? Mark.B : Integer.parseInt(boardValues[i]) == 4 ? Mark.R : Mark.EMPTY;
+            if(Integer.parseInt(boardValues[i]) == 2){
+                board[x][y] = Mark.B;
+                blackCount++;
+            }
+            else if(Integer.parseInt(boardValues[i]) == 4){
+                board[x][y] = Mark.R;
+                redCount++;
+            }
+            else{
+                board[x][y] = Mark.EMPTY;
+            }
 
             x++;
             if(x == 8){
@@ -33,38 +45,47 @@ class Board {
     public Board(Board b) {
         this.size = b.size;
         this.board = new Mark[b.size][b.size];
+        this.redCount = b.redCount;
+        this.blackCount = b.blackCount;
 
         for (int row = 0; row < b.size; row++) {
             System.arraycopy(b.board[row], 0, board[row], 0, b.size);
         }
     }
 
-    public int evaluate(Mark mark){
-        Mark opponent = (mark == Mark.R) ? Mark.B : Mark.R;
-        if (hasWon(mark)) {
-            return Integer.MAX_VALUE;
+    public int evaluate(Mark player, Mark opponent) {
+        if (hasWon(player)) {
+            return Scoring.WIN_SCORE;
         }
         if (hasWon(opponent)) {
-            return Integer.MIN_VALUE;
+            return Scoring.LOSE_SCORE;
         }
         
         // Heuristique temporaire selon la position
         int score = 0;
-        
-        for(int col = 0; col < size; col++){
-            for(int row = 0; row < size; row++){
-                if(board[col][row] == mark){
-                    // Reward pieces closer to opponent's goal
-                    if(mark == Mark.R){
-                        score += 10 + (7 - row) * 5; // Closer to row 0 is better for Red
-                    } else {
-                        score += 10 + row * 5; // Closer to row 7 is better for Black
+
+        // Optimizing code by pre-filtering player's mark
+        if(player == Mark.R){
+            // Ignore first row to save time
+            for(int col = 0; col < size; col++){
+                for(int row = 1; row < size; row++){
+                    if(board[col][row] == player){
+                        // Reward pieces closer to opponent's zone, which is row 0
+                        score += Scoring.PLAYER_MARK + (7 - row) * Scoring.POS_FACTOR;
+                    } else if(board[col][row] == opponent){
+                        score -= Scoring.OPPONENT_MARK + row * Scoring.POS_FACTOR;
                     }
-                } else if(board[col][row] == opponent){
-                    if(mark == Mark.R){
-                        score -= 10 + row * 5;
-                    } else {
-                        score -= 10 + (7 - row) * 5;
+                }
+            }
+        }else{
+            // Ignore last row to save time
+            for(int col = 0; col < size; col++){
+                for(int row = 0; row < size - 1; row++){
+                    if(board[col][row] == player){
+                        // Reward pieces closer to opponent's zone, which is row 8
+                        score += Scoring.PLAYER_MARK + row * Scoring.POS_FACTOR;
+                    } else if(board[col][row] == opponent){
+                        score -= Scoring.OPPONENT_MARK + (7 - row) * Scoring.POS_FACTOR;
                     }
                 }
             }
@@ -80,52 +101,44 @@ class Board {
                     return true;
                 }
             }
-            boolean noMoreBlack = true;
-            for(int col = 0; col < size; col++){
-                for(int row = 0; row < size; row++){
-                    if(board[col][row] == Mark.B){
-                        noMoreBlack = false;
-                        break;
-                    }
-                }
-                if(!noMoreBlack) break;
-            }
-            if(noMoreBlack){
-                return true;
-            }
+
+            return blackCount == 0;
         }
+
         if(player == Mark.B){
             for(int col = 0; col < size; col++){
                 if(board[col][7] == Mark.B){
                     return true;
                 }
             }
-            boolean noMoreRed = true;
-            for(int col = 0; col < size; col++){
-                for(int row = 0; row < size; row++){
-                    if(board[col][row] == Mark.R){
-                        noMoreRed = false;
-                        break;
-                    }
-                }
-                if(!noMoreRed) break;
-            }
-            if(noMoreRed){
-                return true;
-            }
+
+            return redCount == 0;
         }
+
         return false;
     }
 
-    public void play(Move m, Mark mark){
-        m.setMoveTo(board[m.getEndCol()][m.getEndRow()]);
-        board[m.getEndCol()][m.getEndRow()] = mark;
+    public void play(Move m){
+        m.setTarget(board[m.getEndCol()][m.getEndRow()]);
+        board[m.getEndCol()][m.getEndRow()] = m.getPlayer();
         board[m.getStartCol()][m.getStartRow()] = Mark.EMPTY;
+
+        if(m.getTarget() == Mark.B){
+            blackCount--;
+        }else if(m.getTarget() == Mark.R){
+            redCount--;
+        }
     }
 
     public void undoMove(Move m) {
-        board[m.getEndCol()][m.getEndRow()] = m.getMoveTo();
+        board[m.getEndCol()][m.getEndRow()] = m.getTarget();
         board[m.getStartCol()][m.getStartRow()] = m.getPlayer();
+
+        if(m.getTarget() == Mark.B){
+            blackCount++;
+        }else if(m.getTarget() == Mark.R){
+            redCount++;
+        }
     }
 
     public Mark[][] getBoard() {

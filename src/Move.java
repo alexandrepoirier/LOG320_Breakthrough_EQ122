@@ -3,7 +3,8 @@ class Move
     private byte[] start;
     private byte[] end;
     private final Mark player;
-    private Mark moveTo;
+    private Mark target = Mark.UNKNOWN;
+    private int score = Scoring.NONE;
 
     /**
      * Both 'start' and 'end' are arrays of size 2 with [col, row] indexes
@@ -17,7 +18,7 @@ class Move
     }
 
     public Move(String str, Mark player) throws InvalidMoveException{
-        if (str.length() == 4){
+                if (str.length() == 4){
             try{
                 this.player = player;
                 setMoveInternal(str.substring(0, 2).toCharArray(), str.substring(2, 4).toCharArray());
@@ -34,6 +35,14 @@ class Move
         }else {
             throw new InvalidMoveException("Move contains wrong number of characters");
         }
+    }
+
+    public boolean isWinningMove() {
+        return (player == Mark.R && end[1] == 7) || (player == Mark.B && end[1] == 0);
+    }
+
+    public boolean isEatingMove() {
+        return (player == Mark.R && target == Mark.B) || (player == Mark.B && target == Mark.R);
     }
 
     private void setMoveInternal(char[] start, char[] end) throws InvalidMoveException{
@@ -83,8 +92,10 @@ class Move
     public byte getEndRow() { return end[1]; }
     public byte getEndCol() { return end[0]; }
     public Mark getPlayer() { return player; }
-    public void setMoveTo(Mark moveTo) { this.moveTo = moveTo; }
-    public Mark getMoveTo() { return moveTo; }
+    public void setTarget(Mark target) { this.target = target; }
+    public Mark getTarget() { return target; }
+    public void setScore(int score) { this.score = score; }
+    public  int getScore() { return score; }
 }
 
 class InvalidMoveException extends Exception

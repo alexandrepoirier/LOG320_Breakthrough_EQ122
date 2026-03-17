@@ -98,67 +98,7 @@ class CPUPlayer
     }
 
     public Move getBestMove(Board board){
-        // generate all possible moves and pick best!
-        Board copyBoard = new Board(board);
-        return getNextMoveAB(copyBoard).getFirst();
-    }
-
-    public ArrayList<Move> getNextMoveMinMax(Board board)
-    {
-        numExploredNodes = 0;
-        ArrayList<Move> bestMoves = new ArrayList<Move>();
-        int bestScore = Integer.MIN_VALUE;
-        
-        ArrayList<Move> possibleMoves = getPossibleMoves(board,cpuMark);
-        
-        for (Move move : possibleMoves) {
-            board.play(move, cpuMark);
-            int score = minMax(board, false, 0);
-            board.undoMove(move);
-
-            if (score > bestScore) {
-                bestScore = score;
-                bestMoves.clear();
-                bestMoves.add(move);
-            } else if (score == bestScore) {
-                bestMoves.add(move);
-            }
-        }
-        return bestMoves;
-    }
-
-    private int minMax(Board board, boolean isMaximizing, int depth) {
-        numExploredNodes++;
-
-        int boardVal = board.evaluate(cpuMark);
-        if (boardVal == Integer.MAX_VALUE){
-            return boardVal - depth;
-        }
-        if (boardVal == Integer.MIN_VALUE){
-            return boardVal + depth;
-        }
-
-        if (isMaximizing) {
-            ArrayList<Move> possibleMoves = getPossibleMoves(board,cpuMark);
-            int maxScore = Integer.MIN_VALUE;
-            for (Move move : possibleMoves) {
-                board.play(move, cpuMark);
-                int score = minMax(board, false, depth+1);
-                board.undoMove(move);
-                maxScore = Math.max(maxScore, score);
-            }
-            return maxScore;
-        } else {
-            ArrayList<Move> possibleMoves = getPossibleMoves(board,opponentMark);
-            int minScore = Integer.MAX_VALUE;
-            for (Move move : possibleMoves) {
-                board.play(move, opponentMark);
-                int score = minMax(board, true, depth+1);
-                board.undoMove(move);
-                minScore = Math.min(minScore, score);
-            }
-            return minScore;
-        }
+        return getNextMoveAB(board).getFirst();
     }
 
     public ArrayList<Move> getNextMoveAB(Board board){

@@ -60,8 +60,7 @@ class Board {
         if (hasWon(opponent)) {
             return Scoring.LOSE_SCORE;
         }
-        
-        // Heuristique temporaire selon la position
+
         int score = 0;
 
         // Optimizing code by pre-filtering player's mark
@@ -73,7 +72,8 @@ class Board {
                         // Reward pieces closer to opponent's zone, which is row 0
                         score += Scoring.PLAYER_MARK + (7 - row) * Scoring.POS_FACTOR;
                     } else if(board[col][row] == opponent){
-                        score -= Scoring.OPPONENT_MARK + row * Scoring.POS_FACTOR;
+                        // Opponent mark in player territory is bad
+                        score -= Scoring.OPPONENT_MARK + row * (int)Math.pow(1.1, row) * Scoring.POS_FACTOR;
                     }
                 }
             }
@@ -85,7 +85,7 @@ class Board {
                         // Reward pieces closer to opponent's zone, which is row 8
                         score += Scoring.PLAYER_MARK + row * Scoring.POS_FACTOR;
                     } else if(board[col][row] == opponent){
-                        score -= Scoring.OPPONENT_MARK + (7 - row) * Scoring.POS_FACTOR;
+                        score -= Scoring.OPPONENT_MARK + (7 - row) * (int)Math.pow(1.1, (7-row)) * Scoring.POS_FACTOR;
                     }
                 }
             }
@@ -94,7 +94,7 @@ class Board {
         return score;
     }
     
-    private boolean hasWon(Mark player) {
+    public boolean hasWon(Mark player) {
         if(player == Mark.R){
             for(int col = 0; col < size; col++){
                 if(board[col][0] == Mark.R){
@@ -143,5 +143,19 @@ class Board {
 
     public Mark[][] getBoard() {
         return board;
+    }
+
+    public double generateUniqueId() {
+        int index = 0;
+        double id = 0;
+
+        for(int row = 0; row < size; row++){
+            for(int col = 0; col < size; col++){
+                // test this algo for collisions
+                id += (board[col][row].value() * Math.pow(13, index++)) % 4611686018427388039L;
+            }
+        }
+
+        return id;
     }
 }

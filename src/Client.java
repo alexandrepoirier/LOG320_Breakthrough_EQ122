@@ -13,6 +13,7 @@ class Client {
 	private static Board board;
 	private static CPUPlayer TheDominator;
 	private static boolean gameOver = false;
+	private static int turnCount = 0;
 
 	public static final boolean DEBUG_MODE = true;
 	public static PlayMode PLAY_MODE = PlayMode.CPU;
@@ -112,6 +113,7 @@ class Client {
 	}
 
 	public static void Play() throws IOException{
+		turnCount++;
 		switch (PLAY_MODE){
 			case CPU:
 				PlayCPU();
@@ -156,7 +158,7 @@ class Client {
 		Play();
 	}
 
-	public static boolean ValidateOpponentMove() throws IOException {
+	private static boolean ValidateOpponentMove() throws IOException {
 		byte[] buffer = new byte[16];
 		input.read(buffer,0, input.available());
 		String s = new String(buffer);
@@ -173,6 +175,8 @@ class Client {
 			return false;
 		}
 
+		turnCount++;
+
 		return true;
 	}
 
@@ -182,5 +186,9 @@ class Client {
 			System.out.println("Partie terminée.");
 			System.out.println("Waiting for server connection to terminate...");
 		}
+	}
+
+	public static int getTurnCount() {
+		return turnCount;
 	}
 }

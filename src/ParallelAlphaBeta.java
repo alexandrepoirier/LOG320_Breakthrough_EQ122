@@ -1,15 +1,18 @@
 import java.util.ArrayList;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class ParallelAlphaBeta {
     ExecutorService executor;
-    private int exploredNodesCount = 0;
+    private AtomicInteger exploredNodesCount = new AtomicInteger(0);
     private long TIME_LIMIT_MS = 0;
     private long START_TIME = 0;
     private Mark cpuMark;
     private Mark opponentMark;
+    ConcurrentHashMap<Double, BoardScoreEntry> scoreMap =  new ConcurrentHashMap<>((int)20E6);
 
     public ParallelAlphaBeta(int maxThreads, long timeLimit, Mark cpuMark, Mark opponentMark) {
         executor = Executors.newFixedThreadPool(maxThreads);
@@ -20,7 +23,7 @@ public class ParallelAlphaBeta {
 
     public ArrayList<Future<Move>> submit(Board board, ArrayList<Move> moves, int targetDepth, int alpha, int beta, long startTime) {
         START_TIME = startTime;
-        exploredNodesCount = 0;
+        exploredNodesCount.set(0);
 
         ArrayList<Future<Move>> futures = new ArrayList<>();
 
@@ -38,7 +41,7 @@ public class ParallelAlphaBeta {
     }
 
     public int getExploredNodesCount() {
-        return exploredNodesCount;
+        return exploredNodesCount.get();
     }
 
     private boolean isTimeUp(){
@@ -46,31 +49,57 @@ public class ParallelAlphaBeta {
     }
 
     private int alphaBetaInternal(Board board, boolean isMaximizing, int localDepth, int targetDepth, int alpha, int beta){
-        exploredNodesCount++;
+        if(Client.DEBUG_MODE) {
+            exploredNodesCount.incrementAndGet();
+        }
 
+        // [BEGIN] Early exit conditions
         if (isTimeUp()) {
             return 0;
         }
 
-        int boardVal = board.evaluate(cpuMark, opponentMark);
-        if (boardVal == Scoring.WIN_SCORE){
-            return boardVal;
+        if (board.hasWon(cpuMark)){
+            return Scoring.WIN_SCORE;
         }
-        if (boardVal == Scoring.LOSE_SCORE){
-            return boardVal;
+        if (board.hasWon(opponentMark)){
+            return Scoring.LOSE_SCORE;
+        }
+        // [END] Early exit conditions
+
+        double boardId = board.generateUniqueId();
+        BoardScoreEntry scoreEntry = scoreMap.get(boardId);
+
+        // [BEING] Reached terminal node
+        if (localDepth >= targetDepth) {
+            if(scoreEntry != null && scoreEntry.nodeType == BoardScoreEntry.NodeType.TERMINAL) {
+                return scoreEntry.value;
+            }
+            else{
+                int boardValue = board.evaluate(cpuMark, opponentMark);
+                scoreMap.put(boardId, new BoardScoreEntry(boardValue, BoardScoreEntry.NodeType.TERMINAL, localDepth));
+                return boardValue;
+            }
+        }
+        // [END] Reached terminal node
+
+        // [BEGIN] Core algorithm
+        ArrayList<Move> possibleMoves = MoveGenerator.getPossibleMoves(board, isMaximizing ? cpuMark : opponentMark);
+
+        if (possibleMoves.isEmpty()) {
+            return isMaximizing ? Integer.MIN_VALUE + localDepth : Integer.MAX_VALUE - localDepth;
         }
 
-        if (localDepth >= targetDepth) {
-            return boardVal;
-        }
+        int optimalScore = isMaximizing ? Integer.MIN_VALUE : Integer.MAX_VALUE;
 
         if (isMaximizing) {
-            ArrayList<Move> possibleMoves = MoveGenerator.getPossibleMoves(board,cpuMark);
-            if (possibleMoves.isEmpty()) {
-                return Integer.MIN_VALUE + localDepth;
+            if(scoreEntry != null
+                    && scoreEntry.nodeType == BoardScoreEntry.NodeType.MAX
+                    && scoreEntry.depth >= (localDepth + Client.getTurnCount())
+            ) {
+                if(beta <= scoreEntry.value){
+                    return scoreEntry.value;
+                }
             }
-
-            int maxScore = Integer.MIN_VALUE;
 
             for (Move move : possibleMoves) {
                 if (isTimeUp()) {
@@ -81,22 +110,22 @@ public class ParallelAlphaBeta {
                 int score = alphaBetaInternal(board, false, localDepth+1, targetDepth, alpha, beta);
                 board.undoMove(move);
 
-                maxScore = Math.max(maxScore, score);
-                alpha = Math.max(alpha, maxScore);
+                optimalScore = Math.max(optimalScore, score);
+                alpha = Math.max(alpha, optimalScore);
 
                 if (beta <= alpha) {
                     break;
                 }
             }
-
-            return maxScore;
         } else {
-            ArrayList<Move> possibleMoves = MoveGenerator.getPossibleMoves(board,opponentMark);
-            if (possibleMoves.isEmpty()) {
-                return Integer.MAX_VALUE - localDepth;
+            if(scoreEntry != null
+                    && scoreEntry.nodeType == BoardScoreEntry.NodeType.MIN
+                    && scoreEntry.depth >= (localDepth + Client.getTurnCount())
+            ) {
+                if(scoreEntry.value <= alpha){
+                    return scoreEntry.value;
+                }
             }
-
-            int minScore = Integer.MAX_VALUE;
 
             for (Move move : possibleMoves) {
                 if (isTimeUp()) {
@@ -107,15 +136,24 @@ public class ParallelAlphaBeta {
                 int score = alphaBetaInternal(board, true, localDepth+1, targetDepth, alpha, beta);
                 board.undoMove(move);
 
-                minScore = Math.min(minScore, score);
-                beta = Math.min(beta, minScore);
+                optimalScore = Math.min(optimalScore, score);
+                beta = Math.min(beta, optimalScore);
 
                 if (beta <= alpha) {
                     break;
                 }
             }
-
-            return minScore;
         }
+        // [END] Core algorithm
+
+        if (!isTimeUp()) {
+            scoreMap.put(boardId,
+                    new BoardScoreEntry(optimalScore,
+                            isMaximizing ? BoardScoreEntry.NodeType.MAX : BoardScoreEntry.NodeType.MIN,
+                            localDepth + Client.getTurnCount())
+            );
+        }
+
+        return optimalScore;
     }
 }

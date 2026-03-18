@@ -61,7 +61,10 @@ class CPUPlayer
 
         // Iterative deepening
         int currentTargetDepth = 1;
-        int iterativeDepthStep = 2;
+        int iterativeDepthStep = 1;
+
+        int bestScore, alpha, beta;
+        boolean completedDepth;
         
         while (!isTimeUp()) {
             // Reorder moves after getting scores from first iteration
@@ -71,10 +74,10 @@ class CPUPlayer
 
             ArrayList<Move> currentBestMoves = new ArrayList<Move>();
 
-            int bestScore = Integer.MIN_VALUE;
-            int alpha = Integer.MIN_VALUE;
-            int beta = Integer.MAX_VALUE;
-            boolean completedDepth = true;
+            bestScore = Integer.MIN_VALUE;
+            alpha = Integer.MIN_VALUE;
+            beta = Integer.MAX_VALUE;
+            completedDepth = true;
 
             ArrayList<Future<Move>> futures = parallelAlphaBeta.submit(board, possibleMoves, currentTargetDepth, alpha, beta, searchStartTime);
 
@@ -109,28 +112,6 @@ class CPUPlayer
                     }
                 }
             }
-            
-//            for (Move move : possibleMoves) {
-//                if (isTimeUp()) {
-//                    completedDepth = false;
-//                    break;
-//                }
-//
-//                board.play(move);
-//                int score = alphaBeta(board, false, 0, currentTargetDepth, alpha, beta);
-//                move.setScore(score);
-//                board.undoMove(move);
-//
-//                if (score > bestScore) {
-//                    bestScore = score;
-//                    currentBestMoves.clear();
-//                    currentBestMoves.add(move);
-//                } else if (score == bestScore) {
-//                    currentBestMoves.add(move);
-//                }
-//
-//                alpha = Math.max(alpha, bestScore);
-//            }
 
             if(Client.DEBUG_MODE && completedDepth){
                 System.out.printf("Completed depth : %d, explored %d nodes%n", currentTargetDepth, parallelAlphaBeta.getExploredNodesCount());
@@ -153,78 +134,4 @@ class CPUPlayer
         
         return bestMoves;
     }
-
-//    private int alphaBeta(Board board, boolean isMaximizing, int localDepth, int targetDepth, int alpha, int beta) {
-//        numExploredNodes++;
-//
-//        if (isTimeUp()) {
-//            return 0;
-//        }
-//
-//        int boardVal = board.evaluate(cpuMark, opponentMark);
-//        if (boardVal == Scoring.WIN_SCORE){
-//            return boardVal;
-//        }
-//        if (boardVal == Scoring.LOSE_SCORE){
-//            return boardVal;
-//        }
-//
-//        if (localDepth >= targetDepth) {
-//            return boardVal;
-//        }
-//
-//        if (isMaximizing) {
-//            ArrayList<Move> possibleMoves = MoveGenerator.getPossibleMoves(board,cpuMark);
-//            if (possibleMoves.isEmpty()) {
-//                return Integer.MIN_VALUE + localDepth;
-//            }
-//
-//            int maxScore = Integer.MIN_VALUE;
-//
-//            for (Move move : possibleMoves) {
-//                if (isTimeUp()) {
-//                    break;
-//                }
-//
-//                board.play(move);
-//                int score = alphaBeta(board, false, localDepth+1, targetDepth, alpha, beta);
-//                board.undoMove(move);
-//
-//                maxScore = Math.max(maxScore, score);
-//                alpha = Math.max(alpha, maxScore);
-//
-//                if (beta <= alpha) {
-//                    break;
-//                }
-//            }
-//
-//            return maxScore;
-//        } else {
-//            ArrayList<Move> possibleMoves = MoveGenerator.getPossibleMoves(board,opponentMark);
-//            if (possibleMoves.isEmpty()) {
-//                return Integer.MAX_VALUE - localDepth;
-//            }
-//
-//            int minScore = Integer.MAX_VALUE;
-//
-//            for (Move move : possibleMoves) {
-//                if (isTimeUp()) {
-//                    break;
-//                }
-//
-//                board.play(move);
-//                int score = alphaBeta(board, true, localDepth+1, targetDepth, alpha, beta);
-//                board.undoMove(move);
-//
-//                minScore = Math.min(minScore, score);
-//                beta = Math.min(beta, minScore);
-//
-//                if (beta <= alpha) {
-//                    break;
-//                }
-//            }
-//
-//            return minScore;
-//        }
-//    }
 }

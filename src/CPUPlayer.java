@@ -4,10 +4,9 @@ import java.util.concurrent.Future;
 
 class CPUPlayer
 {
-    private Mark cpuMark;
-    private Mark opponentMark;
+    private final Mark cpuMark;
+    private final Mark opponentMark;
 
-//    private int numExploredNodes;
     private long searchStartTime;
     private static final long TIME_LIMIT_MS = 4800;
 
@@ -34,6 +33,7 @@ class CPUPlayer
     public Move getBestMove(Board board){
         searchStartTime = System.currentTimeMillis();
         ArrayList<Move> moves = generateBestMoves(board);
+        parallelAlphaBeta.cleanupMap();
 
         if(Client.DEBUG_MODE){
             System.out.printf("Took %.2f s to get moves%n", (float)(System.currentTimeMillis() - searchStartTime) / 1000.);
@@ -43,8 +43,6 @@ class CPUPlayer
     }
 
     public ArrayList<Move> generateBestMoves(Board board){
-//        numExploredNodes = 0;
-        
         ArrayList<Move> bestMoves = new ArrayList<Move>();
         ArrayList<Move> possibleMoves = MoveGenerator.getPossibleMoves(board,cpuMark);
 
@@ -59,10 +57,7 @@ class CPUPlayer
             return 0;
         });
 
-        // Iterative deepening
         int currentTargetDepth = 1;
-        int iterativeDepthStep = 1;
-
         int bestScore, alpha, beta;
         boolean completedDepth;
         
@@ -115,6 +110,7 @@ class CPUPlayer
 
             if(Client.DEBUG_MODE && completedDepth){
                 System.out.printf("Completed depth : %d, explored %d nodes%n", currentTargetDepth, parallelAlphaBeta.getExploredNodesCount());
+                //System.out.printf("Collision count : %d%n", parallelAlphaBeta.collisions.get());
             }
 
             if (completedDepth && !currentBestMoves.isEmpty()) {
@@ -125,7 +121,7 @@ class CPUPlayer
                 }
             }
             
-            currentTargetDepth+=iterativeDepthStep;
+            currentTargetDepth++;
         }
 
         if (bestMoves.isEmpty() && !possibleMoves.isEmpty()) {

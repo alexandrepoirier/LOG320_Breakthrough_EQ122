@@ -1,3 +1,5 @@
+import java.math.BigInteger;
+
 class Board {
     private Mark[][] board;
     private int size;
@@ -51,6 +53,18 @@ class Board {
         for (int row = 0; row < b.size; row++) {
             System.arraycopy(b.board[row], 0, board[row], 0, b.size);
         }
+    }
+
+    public boolean equals(Board b) {
+        if(this.size != b.size) { return false; }
+
+        for(int i = 0; i < b.size; i++){
+            for(int j = 0; j < b.size; j++){
+                if(board[i][j] != b.board[i][j]) { return false; }
+            }
+        }
+
+        return true;
     }
 
     public int evaluate(Mark player, Mark opponent) {
@@ -145,14 +159,13 @@ class Board {
         return board;
     }
 
-    public double generateUniqueId() {
-        int index = 0;
-        double id = 0;
+    public long generateUniqueId() {
+        long id = 0;
 
         for(int row = 0; row < size; row++){
+            long rowPower = (long)Math.pow(31, row);
             for(int col = 0; col < size; col++){
-                // test this algo for collisions
-                id += (board[col][row].value() * Math.pow(13, index++)) % 4611686018427388039L;
+                id += (board[col][row].value() * (long)Math.pow(13, col) * rowPower) % 4611686018427388039L;
             }
         }
 

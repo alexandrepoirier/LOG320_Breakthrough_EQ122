@@ -1,8 +1,10 @@
+import java.math.BigInteger;
+
 public enum Mark{
-    R (1),
-    B (2),
-    EMPTY (0),
-    UNKNOWN (-1);
+    R (2),
+    B (3),
+    EMPTY (-1),
+    UNKNOWN (0);
 
     private final int value;
 

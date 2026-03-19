@@ -8,11 +8,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class ParallelAlphaBeta {
     ExecutorService executor;
     private AtomicInteger exploredNodesCount = new AtomicInteger(0);
+    //public AtomicInteger collisions = new AtomicInteger(0);
     private long TIME_LIMIT_MS = 0;
     private long START_TIME = 0;
     private Mark cpuMark;
     private Mark opponentMark;
-    ConcurrentHashMap<Double, BoardScoreEntry> scoreMap =  new ConcurrentHashMap<>((int)20E6);
+    ConcurrentHashMap<Long, BoardScoreEntry> scoreMap =  new ConcurrentHashMap<>((int)20E6);
+    //ConcurrentHashMap<Long, Board> boardKeyMap = new ConcurrentHashMap<>((int)20E6);
 
     public ParallelAlphaBeta(int maxThreads, long timeLimit, Mark cpuMark, Mark opponentMark) {
         executor = Executors.newFixedThreadPool(maxThreads);
@@ -24,6 +26,7 @@ public class ParallelAlphaBeta {
     public ArrayList<Future<Move>> submit(Board board, ArrayList<Move> moves, int targetDepth, int alpha, int beta, long startTime) {
         START_TIME = startTime;
         exploredNodesCount.set(0);
+        //collisions.set(0);
 
         ArrayList<Future<Move>> futures = new ArrayList<>();
 
@@ -38,6 +41,33 @@ public class ParallelAlphaBeta {
         }
 
         return futures;
+    }
+
+    public void cleanupMap(){
+        executor.submit(() ->{
+            if(Client.DEBUG_MODE){
+                System.out.println("Cleaning up map...");
+            }
+
+            ArrayList<Long> toRemove = new ArrayList<>();
+            scoreMap.forEach( (k,v) -> {
+                if(v.depth <= Client.getTurnCount()){
+                    toRemove.add(k);
+                }
+            });
+
+            if(Client.DEBUG_MODE){
+                System.out.printf("Found %d elements to remove%n",  toRemove.size());
+            }
+
+            for(Long k : toRemove){
+                scoreMap.remove(k);
+            }
+
+            if(Client.DEBUG_MODE){
+                System.out.println("Done cleaning map");
+            }
+        });
     }
 
     public int getExploredNodesCount() {
@@ -66,7 +96,7 @@ public class ParallelAlphaBeta {
         }
         // [END] Early exit conditions
 
-        double boardId = board.generateUniqueId();
+        long boardId = board.generateUniqueId();
         BoardScoreEntry scoreEntry = scoreMap.get(boardId);
 
         // [BEING] Reached terminal node
@@ -77,6 +107,7 @@ public class ParallelAlphaBeta {
             else{
                 int boardValue = board.evaluate(cpuMark, opponentMark);
                 scoreMap.put(boardId, new BoardScoreEntry(boardValue, BoardScoreEntry.NodeType.TERMINAL, localDepth));
+                //boardKeyMap.put(boardId, new Board(board));
                 return boardValue;
             }
         }
@@ -92,6 +123,7 @@ public class ParallelAlphaBeta {
         int optimalScore = isMaximizing ? Integer.MIN_VALUE : Integer.MAX_VALUE;
 
         if (isMaximizing) {
+            // Check if we stored the value and if it is still useful
             if(scoreEntry != null
                     && scoreEntry.nodeType == BoardScoreEntry.NodeType.MAX
                     && scoreEntry.depth >= (localDepth + Client.getTurnCount())
@@ -118,6 +150,7 @@ public class ParallelAlphaBeta {
                 }
             }
         } else {
+            // Check if we stored the value and if it is still useful
             if(scoreEntry != null
                     && scoreEntry.nodeType == BoardScoreEntry.NodeType.MIN
                     && scoreEntry.depth >= (localDepth + Client.getTurnCount())
@@ -146,12 +179,24 @@ public class ParallelAlphaBeta {
         }
         // [END] Core algorithm
 
+        // Store value in map if we completed exploration of all branches
         if (!isTimeUp()) {
             scoreMap.put(boardId,
                     new BoardScoreEntry(optimalScore,
                             isMaximizing ? BoardScoreEntry.NodeType.MAX : BoardScoreEntry.NodeType.MIN,
                             localDepth + Client.getTurnCount())
             );
+
+//            if(Client.DEBUG_MODE) {
+//                // Board ID collision test
+//                if (boardKeyMap.containsKey(boardId)) {
+//                    if (!boardKeyMap.get(boardId).equals(board)) {
+//                        collisions.incrementAndGet();
+//                    }
+//                } else {
+//                    boardKeyMap.put(boardId, new Board(board));
+//                }
+//            }
         }
 
         return optimalScore;

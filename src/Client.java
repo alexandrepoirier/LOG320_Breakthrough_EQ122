@@ -15,7 +15,7 @@ class Client {
 	private static boolean gameOver = false;
 	private static int turnCount = 0;
 
-	public static final boolean DEBUG_MODE = true;
+	public static final boolean DEBUG_MODE = false;
 	public static PlayMode PLAY_MODE = PlayMode.CPU;
 
 	public static void main(String[] args) {

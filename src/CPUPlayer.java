@@ -1,6 +1,7 @@
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 class CPUPlayer
 {
@@ -9,13 +10,14 @@ class CPUPlayer
 
     private long searchStartTime;
     private static final long TIME_LIMIT_MS = 4800;
+    private static AtomicBoolean IS_TIME_UP = new AtomicBoolean(false);
 
     ParallelAlphaBeta parallelAlphaBeta;
 
     public CPUPlayer(Mark cpu){
         this.cpuMark = cpu;
         this.opponentMark = (cpu == Mark.R) ? Mark.B : Mark.R;
-        parallelAlphaBeta = new ParallelAlphaBeta(Runtime.getRuntime().availableProcessors() + 1, TIME_LIMIT_MS, cpuMark, opponentMark);
+        parallelAlphaBeta = new ParallelAlphaBeta(Runtime.getRuntime().availableProcessors() + 1, cpuMark, opponentMark, IS_TIME_UP);
     }
 
     public Mark getCpuMark(){
@@ -27,13 +29,21 @@ class CPUPlayer
     }
 
     private boolean isTimeUp() {
-        return (System.currentTimeMillis() - searchStartTime) >= TIME_LIMIT_MS;
+        if(System.currentTimeMillis() - searchStartTime >= TIME_LIMIT_MS){
+            IS_TIME_UP.set(true);
+            return true;
+        }
+
+        return false;
     }
 
     public Move getBestMove(Board board){
+        IS_TIME_UP.set(false);
         searchStartTime = System.currentTimeMillis();
         ArrayList<Move> moves = generateBestMoves(board);
-        parallelAlphaBeta.cleanupMap();
+
+        // not sure this is really needed, on va le garder au cas où
+        //parallelAlphaBeta.cleanupMap();
 
         if(Client.DEBUG_MODE){
             System.out.printf("Took %.2f s to get moves%n", (float)(System.currentTimeMillis() - searchStartTime) / 1000.);
@@ -58,7 +68,7 @@ class CPUPlayer
         });
 
         int currentTargetDepth = 1;
-        int bestScore, alpha, beta;
+        int bestScore;
         boolean completedDepth;
         
         while (!isTimeUp()) {
@@ -70,11 +80,9 @@ class CPUPlayer
             ArrayList<Move> currentBestMoves = new ArrayList<Move>();
 
             bestScore = Integer.MIN_VALUE;
-            alpha = Integer.MIN_VALUE;
-            beta = Integer.MAX_VALUE;
             completedDepth = true;
 
-            ArrayList<Future<Move>> futures = parallelAlphaBeta.submit(board, possibleMoves, currentTargetDepth, alpha, beta, searchStartTime);
+            ArrayList<Future<Move>> futures = parallelAlphaBeta.submit(board, possibleMoves, currentTargetDepth, Integer.MIN_VALUE, Integer.MAX_VALUE);
 
             int i = -1;
             while(futures.size() > 0){
@@ -98,8 +106,6 @@ class CPUPlayer
                         } else if (move.getScore() == bestScore) {
                             currentBestMoves.add(move);
                         }
-
-                        alpha = Math.max(alpha, bestScore);
                     }catch(Exception e){
                         // Suck it
                     }finally{

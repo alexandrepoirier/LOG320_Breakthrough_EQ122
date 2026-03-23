@@ -67,7 +67,7 @@ class Board {
         return true;
     }
 
-    public int evaluate(Mark player, Mark opponent) {
+    public int algo1(Mark player, Mark opponent){
         if (hasWon(player)) {
             return Scoring.WIN_SCORE;
         }
@@ -81,7 +81,7 @@ class Board {
         if(player == Mark.R){
             // Ignore first row to save time
             for(int col = 0; col < size; col++){
-                for(int row = 1; row < size; row++){
+                for(int row = 0; row < size; row++){
                     if(board[col][row] == player){
                         // Reward pieces closer to opponent's zone, which is row 0
                         score += Scoring.PLAYER_MARK + (7 - row) * Scoring.POS_FACTOR;
@@ -94,7 +94,7 @@ class Board {
         }else{
             // Ignore last row to save time
             for(int col = 0; col < size; col++){
-                for(int row = 0; row < size - 1; row++){
+                for(int row = 0; row < size; row++){
                     if(board[col][row] == player){
                         // Reward pieces closer to opponent's zone, which is row 8
                         score += Scoring.PLAYER_MARK + row * Scoring.POS_FACTOR;
@@ -104,8 +104,53 @@ class Board {
                 }
             }
         }
-        
+
         return score;
+    }
+
+    public int algo2(Mark player, Mark opponent){
+        if (hasWon(player)) {
+            return Scoring.WIN_SCORE;
+        }
+        if (hasWon(opponent)) {
+            return Scoring.LOSE_SCORE;
+        }
+
+        int score = 0;
+
+        // Optimizing code by pre-filtering player's mark
+        if(player == Mark.R){
+            // Ignore first row to save time
+            for(int col = 0; col < size; col++){
+                for(int row = 0; row < size; row++){
+                    if(board[col][row] == player){
+                        // Reward pieces closer to opponent's zone, which is row 0
+                        score += Scoring.PLAYER_MARK + (7 - row) * Scoring.POS_FACTOR;
+                    } else if(board[col][row] == opponent){
+                        // Opponent mark in player territory is bad
+                        score -= Scoring.OPPONENT_MARK + row * Scoring.POS_FACTOR;
+                    }
+                }
+            }
+        }else{
+            // Ignore last row to save time
+            for(int col = 0; col < size; col++){
+                for(int row = 0; row < size; row++){
+                    if(board[col][row] == player){
+                        // Reward pieces closer to opponent's zone, which is row 8
+                        score += Scoring.PLAYER_MARK + row * Scoring.POS_FACTOR;
+                    } else if(board[col][row] == opponent){
+                        score -= Scoring.OPPONENT_MARK + (7 - row) * Scoring.POS_FACTOR;
+                    }
+                }
+            }
+        }
+
+        return score;
+    }
+
+    public int evaluate(Mark player, Mark opponent) {
+        return algo2(player, opponent);
     }
     
     public boolean hasWon(Mark player) {

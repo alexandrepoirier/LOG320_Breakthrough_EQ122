@@ -3,28 +3,27 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class ParallelAlphaBeta {
     ExecutorService executor;
-    private AtomicInteger exploredNodesCount = new AtomicInteger(0);
+    private AtomicBoolean IS_TIME_UP;
+    private final AtomicInteger exploredNodesCount = new AtomicInteger(0);
     //public AtomicInteger collisions = new AtomicInteger(0);
-    private long TIME_LIMIT_MS = 0;
-    private long START_TIME = 0;
-    private Mark cpuMark;
-    private Mark opponentMark;
+    private final Mark cpuMark;
+    private final Mark opponentMark;
     ConcurrentHashMap<Long, BoardScoreEntry> scoreMap =  new ConcurrentHashMap<>((int)20E6);
     //ConcurrentHashMap<Long, Board> boardKeyMap = new ConcurrentHashMap<>((int)20E6);
 
-    public ParallelAlphaBeta(int maxThreads, long timeLimit, Mark cpuMark, Mark opponentMark) {
+    public ParallelAlphaBeta(int maxThreads, Mark cpuMark, Mark opponentMark, AtomicBoolean isTimeUp) {
         executor = Executors.newFixedThreadPool(maxThreads);
-        this.TIME_LIMIT_MS = timeLimit;
         this.cpuMark = cpuMark;
         this.opponentMark = opponentMark;
+        IS_TIME_UP = isTimeUp;
     }
 
-    public ArrayList<Future<Move>> submit(Board board, ArrayList<Move> moves, int targetDepth, int alpha, int beta, long startTime) {
-        START_TIME = startTime;
+    public ArrayList<Future<Move>> submit(Board board, ArrayList<Move> moves, int targetDepth, int alpha, int beta) {
         exploredNodesCount.set(0);
         //collisions.set(0);
 
@@ -51,7 +50,7 @@ public class ParallelAlphaBeta {
 
             ArrayList<Long> toRemove = new ArrayList<>();
             scoreMap.forEach( (k,v) -> {
-                if(v.depth <= Client.getTurnCount()){
+                if(v.depth <= 4){
                     toRemove.add(k);
                 }
             });
@@ -61,6 +60,9 @@ public class ParallelAlphaBeta {
             }
 
             for(Long k : toRemove){
+                if(GameState.getState() != GameState.State.WAITING){
+                    break;
+                }
                 scoreMap.remove(k);
             }
 
@@ -74,20 +76,12 @@ public class ParallelAlphaBeta {
         return exploredNodesCount.get();
     }
 
-    private boolean isTimeUp(){
-        return System.currentTimeMillis() - START_TIME > TIME_LIMIT_MS;
-    }
-
     private int alphaBetaInternal(Board board, boolean isMaximizing, int localDepth, int targetDepth, int alpha, int beta){
         if(Client.DEBUG_MODE) {
             exploredNodesCount.incrementAndGet();
         }
 
         // [BEGIN] Early exit conditions
-        if (isTimeUp()) {
-            return 0;
-        }
-
         if (board.hasWon(cpuMark)){
             return Scoring.WIN_SCORE;
         }
@@ -99,6 +93,10 @@ public class ParallelAlphaBeta {
         long boardId = board.generateUniqueId();
         BoardScoreEntry scoreEntry = scoreMap.get(boardId);
 
+        if (IS_TIME_UP.get()) {
+            return 0;
+        }
+
         // [BEING] Reached terminal node
         if (localDepth >= targetDepth) {
             if(scoreEntry != null && scoreEntry.nodeType == BoardScoreEntry.NodeType.TERMINAL) {
@@ -106,7 +104,12 @@ public class ParallelAlphaBeta {
             }
             else{
                 int boardValue = board.evaluate(cpuMark, opponentMark);
-                scoreMap.put(boardId, new BoardScoreEntry(boardValue, BoardScoreEntry.NodeType.TERMINAL, localDepth));
+
+                scoreMap.put(boardId,
+                        new BoardScoreEntry(boardValue,
+                                BoardScoreEntry.NodeType.TERMINAL,
+                                localDepth + Client.getTurnCount())
+                );
                 //boardKeyMap.put(boardId, new Board(board));
                 return boardValue;
             }
@@ -114,9 +117,13 @@ public class ParallelAlphaBeta {
         // [END] Reached terminal node
 
         // [BEGIN] Core algorithm
-        ArrayList<Move> possibleMoves = MoveGenerator.getPossibleMoves(board, isMaximizing ? cpuMark : opponentMark);
+        ArrayList<Move> possibleMoves = null;
 
-        if (possibleMoves.isEmpty()) {
+        if(!IS_TIME_UP.get()) {
+            possibleMoves = MoveGenerator.getPossibleMoves(board, isMaximizing ? cpuMark : opponentMark);
+        }
+
+        if(possibleMoves == null || possibleMoves.isEmpty()){
             return isMaximizing ? Integer.MIN_VALUE + localDepth : Integer.MAX_VALUE - localDepth;
         }
 
@@ -126,7 +133,7 @@ public class ParallelAlphaBeta {
             // Check if we stored the value and if it is still useful
             if(scoreEntry != null
                     && scoreEntry.nodeType == BoardScoreEntry.NodeType.MAX
-                    && scoreEntry.depth >= (localDepth + Client.getTurnCount())
+                    && scoreEntry.depth >= (targetDepth - localDepth)
             ) {
                 if(beta <= scoreEntry.value){
                     return scoreEntry.value;
@@ -134,7 +141,7 @@ public class ParallelAlphaBeta {
             }
 
             for (Move move : possibleMoves) {
-                if (isTimeUp()) {
+                if (IS_TIME_UP.get()) {
                     break;
                 }
 
@@ -153,7 +160,7 @@ public class ParallelAlphaBeta {
             // Check if we stored the value and if it is still useful
             if(scoreEntry != null
                     && scoreEntry.nodeType == BoardScoreEntry.NodeType.MIN
-                    && scoreEntry.depth >= (localDepth + Client.getTurnCount())
+                    && scoreEntry.depth >= (targetDepth - localDepth)
             ) {
                 if(scoreEntry.value <= alpha){
                     return scoreEntry.value;
@@ -161,7 +168,7 @@ public class ParallelAlphaBeta {
             }
 
             for (Move move : possibleMoves) {
-                if (isTimeUp()) {
+                if (IS_TIME_UP.get()) {
                     break;
                 }
 
@@ -180,11 +187,11 @@ public class ParallelAlphaBeta {
         // [END] Core algorithm
 
         // Store value in map if we completed exploration of all branches
-        if (!isTimeUp()) {
+        if (!IS_TIME_UP.get()) {
             scoreMap.put(boardId,
                     new BoardScoreEntry(optimalScore,
                             isMaximizing ? BoardScoreEntry.NodeType.MAX : BoardScoreEntry.NodeType.MIN,
-                            localDepth + Client.getTurnCount())
+                            targetDepth - localDepth)
             );
 
 //            if(Client.DEBUG_MODE) {

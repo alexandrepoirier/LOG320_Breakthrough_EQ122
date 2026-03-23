@@ -1,5 +1,6 @@
 import java.io.*;
 import java.net.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 
 class Client {
@@ -12,10 +13,9 @@ class Client {
 
 	private static Board board;
 	private static CPUPlayer TheDominator;
-	private static boolean gameOver = false;
 	private static int turnCount = 0;
 
-	public static final boolean DEBUG_MODE = false;
+	public static final boolean DEBUG_MODE = true;
 	public static PlayMode PLAY_MODE = PlayMode.CPU;
 
 	public static void main(String[] args) {
@@ -28,7 +28,7 @@ class Client {
 			console = new BufferedReader(new InputStreamReader(System.in));
 			char cmd;
 
-			while(!gameOver){
+			while(GameState.getState() != GameState.State.TERMINATED){
 				cmd = (char)input.read();
 
 				if (DEBUG_MODE) {
@@ -37,7 +37,7 @@ class Client {
 
 				switch (cmd){
 					case '0':
-						System.exit(0);
+						GameState.setState(GameState.State.TERMINATED);
 					case '1':
 						BeginGameAsRed();
 						break;
@@ -54,19 +54,15 @@ class Client {
 					case '5':
 						GameOver();
 						break;
+					case '\uFFFF':
+						GameState.setState(GameState.State.TERMINATED);
 				}
 			}
 		}
 		catch (IOException e) {
 			System.out.println(e.getMessage());
-		}
-
-		try{
-			while(MyClient.isConnected()){
-				Thread.sleep(500);
-			}
-		}catch (InterruptedException e){
-			// do nothing
+		}finally{
+			System.exit(0);
 		}
     }
 
@@ -113,6 +109,8 @@ class Client {
 	}
 
 	public static void Play() throws IOException{
+		GameState.setState(GameState.State.PLAYING);
+
 		turnCount++;
 		switch (PLAY_MODE){
 			case CPU:
@@ -122,6 +120,8 @@ class Client {
 				PlayManual();
 				break;
 		}
+
+		GameState.setState(GameState.State.WAITING);
 	}
 
 	private static void PlayCPU() throws IOException{
@@ -181,10 +181,10 @@ class Client {
 	}
 
 	private static void GameOver() {
-		gameOver = true;
+		GameState.setState(GameState.State.OVER);
+
 		if (DEBUG_MODE){
 			System.out.println("Partie terminée.");
-			System.out.println("Waiting for server connection to terminate...");
 		}
 	}
 

@@ -11,6 +11,7 @@ class CPUPlayer
     private long searchStartTime;
     private static final long TIME_LIMIT_MS = 4800;
     private static AtomicBoolean IS_TIME_UP = new AtomicBoolean(false);
+    private static int MAX_SEARCH_DEPTH = 30;
 
     ParallelAlphaBeta parallelAlphaBeta;
 
@@ -82,7 +83,9 @@ class CPUPlayer
             bestScore = Integer.MIN_VALUE;
             completedDepth = true;
 
-            ArrayList<Future<Move>> futures = parallelAlphaBeta.submit(board, possibleMoves, currentTargetDepth, Integer.MIN_VALUE, Integer.MAX_VALUE);
+            ArrayList<Future<Move>> futures = parallelAlphaBeta.submit(board, possibleMoves, currentTargetDepth,
+                    Integer.MIN_VALUE, Integer.MAX_VALUE,
+                    Client.getTurnCount());
 
             int i = -1;
             while(futures.size() > 0){
@@ -90,6 +93,11 @@ class CPUPlayer
 
                 if(isTimeUp()){
                     completedDepth = false;
+
+                    for(Future f : futures){
+                        f.cancel(true);
+                    }
+
                     break;
                 }
 
@@ -110,6 +118,14 @@ class CPUPlayer
                         // Suck it
                     }finally{
                         futures.remove(i);
+                        i--;
+                    }
+
+                    if(Client.DEBUG_MODE){
+                        System.out.printf("%d/%d futures completed%n", possibleMoves.size() - futures.size(), possibleMoves.size());
+                        if((float)parallelAlphaBeta.executor.getActiveCount()/parallelAlphaBeta.executor.getCorePoolSize() < 0.5) {
+                            System.out.println("Less than 50% threads are active");
+                        }
                     }
                 }
             }
@@ -126,7 +142,14 @@ class CPUPlayer
                     break;
                 }
             }
-            
+
+            if(currentTargetDepth == MAX_SEARCH_DEPTH){
+                if(Client.DEBUG_MODE){
+                    System.out.println("Reached max search depth");
+                }
+                break;
+            }
+
             currentTargetDepth++;
         }
 

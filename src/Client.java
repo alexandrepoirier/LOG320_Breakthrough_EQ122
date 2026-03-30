@@ -1,6 +1,7 @@
 import java.io.*;
 import java.net.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 
 class Client {
@@ -13,7 +14,7 @@ class Client {
 
 	private static Board board;
 	private static CPUPlayer TheDominator;
-	private static int turnCount = 0;
+	private static final AtomicInteger turnCount = new AtomicInteger(0);
 
 	public static final boolean DEBUG_MODE = true;
 	public static PlayMode PLAY_MODE = PlayMode.CPU;
@@ -59,7 +60,7 @@ class Client {
 				}
 			}
 		}
-		catch (IOException e) {
+		catch (Exception e) {
 			System.out.println(e.getMessage());
 		}finally{
 			System.exit(0);
@@ -111,7 +112,7 @@ class Client {
 	public static void Play() throws IOException{
 		GameState.setState(GameState.State.PLAYING);
 
-		turnCount++;
+		turnCount.incrementAndGet();
 		switch (PLAY_MODE){
 			case CPU:
 				PlayCPU();
@@ -175,7 +176,7 @@ class Client {
 			return false;
 		}
 
-		turnCount++;
+		turnCount.incrementAndGet();
 
 		return true;
 	}
@@ -189,6 +190,6 @@ class Client {
 	}
 
 	public static int getTurnCount() {
-		return turnCount;
+		return turnCount.get();
 	}
 }

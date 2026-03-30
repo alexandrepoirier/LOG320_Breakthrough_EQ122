@@ -1,14 +1,12 @@
 import java.util.ArrayList;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class ParallelAlphaBeta {
-    ExecutorService executor;
-    private AtomicBoolean IS_TIME_UP;
+    public ThreadPoolExecutor executor;
+    private final AtomicBoolean IS_TIME_UP;
+    private final AtomicBoolean CAN_SUB_THREAD = new AtomicBoolean(false);
     private final AtomicInteger exploredNodesCount = new AtomicInteger(0);
     //public AtomicInteger collisions = new AtomicInteger(0);
     private final Mark cpuMark;
@@ -17,14 +15,25 @@ public class ParallelAlphaBeta {
     //ConcurrentHashMap<Long, Board> boardKeyMap = new ConcurrentHashMap<>((int)20E6);
 
     public ParallelAlphaBeta(int maxThreads, Mark cpuMark, Mark opponentMark, AtomicBoolean isTimeUp) {
-        executor = Executors.newFixedThreadPool(maxThreads);
+        executor = new ThreadPoolExecutor(maxThreads, maxThreads, Integer.MAX_VALUE, TimeUnit.SECONDS, new LinkedBlockingQueue<>());
         this.cpuMark = cpuMark;
         this.opponentMark = opponentMark;
         IS_TIME_UP = isTimeUp;
     }
 
-    public ArrayList<Future<Move>> submit(Board board, ArrayList<Move> moves, int targetDepth, int alpha, int beta) {
-        exploredNodesCount.set(0);
+    public ArrayList<Future<Move>> submit(Board board, ArrayList<Move> moves, int targetDepth, int alpha, int beta, int turn) {
+        return submitInternal(board, moves,targetDepth, alpha, beta, true, turn);
+    }
+
+    private ArrayList<Future<Move>> submitInternal(Board board, ArrayList<Move> moves, int targetDepth,
+                                                   int alpha, int beta,
+                                                   boolean initialCall, int turn) {
+        CAN_SUB_THREAD.set(false);
+
+        if(initialCall){
+            exploredNodesCount.set(0);
+        }
+
         //collisions.set(0);
 
         ArrayList<Future<Move>> futures = new ArrayList<>();
@@ -33,11 +42,13 @@ public class ParallelAlphaBeta {
             futures.add(executor.submit(() -> {
                 Board threadBoard = new Board(board);
                 threadBoard.play(move);
-                int score = alphaBetaInternal(threadBoard, false, 0, targetDepth, alpha, beta);
+                int score = alphaBetaInternal(threadBoard, false, 0, targetDepth, alpha, beta, turn);
                 move.setScore(score);
                 return move;
             }));
         }
+
+        CAN_SUB_THREAD.set(true);
 
         return futures;
     }
@@ -76,7 +87,12 @@ public class ParallelAlphaBeta {
         return exploredNodesCount.get();
     }
 
-    private int alphaBetaInternal(Board board, boolean isMaximizing, int localDepth, int targetDepth, int alpha, int beta){
+    private float getThreadPoolActivityRatio(){
+        return (float)executor.getActiveCount() / executor.getCorePoolSize();
+    }
+
+    private int alphaBetaInternal(Board board, boolean isMaximizing, int localDepth, int targetDepth,
+                                  int alpha, int beta, int turn){
         if(Client.DEBUG_MODE) {
             exploredNodesCount.incrementAndGet();
         }
@@ -93,7 +109,8 @@ public class ParallelAlphaBeta {
         long boardId = board.generateUniqueId();
         BoardScoreEntry scoreEntry = scoreMap.get(boardId);
 
-        if (IS_TIME_UP.get()) {
+        // this condition is necessary if the opponent is very quick as the time up flag might go on/off too quickly
+        if (IS_TIME_UP.get() || Client.getTurnCount() > turn) {
             return 0;
         }
 
@@ -129,35 +146,17 @@ public class ParallelAlphaBeta {
 
         int optimalScore = isMaximizing ? Integer.MIN_VALUE : Integer.MAX_VALUE;
 
+        // Check if we stored the value and if it is still useful
         if (isMaximizing) {
-            // Check if we stored the value and if it is still useful
-            if(scoreEntry != null
+            if (scoreEntry != null
                     && scoreEntry.nodeType == BoardScoreEntry.NodeType.MAX
                     && scoreEntry.depth >= (targetDepth - localDepth)
             ) {
-                if(beta <= scoreEntry.value){
+                if (beta <= scoreEntry.value) {
                     return scoreEntry.value;
                 }
             }
-
-            for (Move move : possibleMoves) {
-                if (IS_TIME_UP.get()) {
-                    break;
-                }
-
-                board.play(move);
-                int score = alphaBetaInternal(board, false, localDepth+1, targetDepth, alpha, beta);
-                board.undoMove(move);
-
-                optimalScore = Math.max(optimalScore, score);
-                alpha = Math.max(alpha, optimalScore);
-
-                if (beta <= alpha) {
-                    break;
-                }
-            }
-        } else {
-            // Check if we stored the value and if it is still useful
+        }else {
             if(scoreEntry != null
                     && scoreEntry.nodeType == BoardScoreEntry.NodeType.MIN
                     && scoreEntry.depth >= (targetDepth - localDepth)
@@ -166,18 +165,79 @@ public class ParallelAlphaBeta {
                     return scoreEntry.value;
                 }
             }
+        }
 
+        // Thread management : start new threads if possible to maximize parallelization
+        if(getThreadPoolActivityRatio() <= 0.6
+                && CAN_SUB_THREAD.get()
+                && executor.getQueue().isEmpty()
+        ){
+            ArrayList<Future<Move>> futures = submitInternal(board, possibleMoves, localDepth + 1,
+                    alpha, beta, false, turn);
+
+            if(Client.DEBUG_MODE){
+                System.out.printf("Starting %d sub-threads%n", futures.size());
+            }
+
+            int i = -1;
+            while(futures.size() > 0){
+                i = (i+1)%futures.size();
+
+                if(IS_TIME_UP.get()){
+                    for(Future f : futures){
+                        f.cancel(true);
+                    }
+
+                    break;
+                }
+
+                Future<Move> future = futures.get(i);
+
+                if(future.isDone()){
+                    try{
+                        Move move = future.get();
+
+                        if(isMaximizing) {
+                            optimalScore = Math.max(optimalScore, move.getScore());
+                            alpha = Math.max(alpha, optimalScore);
+                        }else {
+                            optimalScore = Math.min(optimalScore, move.getScore());
+                            beta = Math.min(beta, optimalScore);
+                        }
+
+                        if (beta <= alpha) {
+                            break;
+                        }
+                    }catch(Exception e){
+                        // Suck it
+                    }finally{
+                        futures.remove(i);
+                        i--;
+                    }
+
+                    if(Client.DEBUG_MODE){
+                        System.out.printf("- %d/%d sub-futures completed%n", possibleMoves.size() - futures.size(), possibleMoves.size());
+                    }
+                }
+            }
+        }else{ // process here within active thread
             for (Move move : possibleMoves) {
                 if (IS_TIME_UP.get()) {
                     break;
                 }
 
                 board.play(move);
-                int score = alphaBetaInternal(board, true, localDepth+1, targetDepth, alpha, beta);
+                int score = alphaBetaInternal(board, false, localDepth + 1, targetDepth,
+                        alpha, beta, turn);
                 board.undoMove(move);
 
-                optimalScore = Math.min(optimalScore, score);
-                beta = Math.min(beta, optimalScore);
+                if(isMaximizing) {
+                    optimalScore = Math.max(optimalScore, score);
+                    alpha = Math.max(alpha, optimalScore);
+                }else {
+                    optimalScore = Math.min(optimalScore, score);
+                    beta = Math.min(beta, optimalScore);
+                }
 
                 if (beta <= alpha) {
                     break;

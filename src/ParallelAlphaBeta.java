@@ -215,9 +215,13 @@ public class ParallelAlphaBeta {
                         i--;
                     }
 
-                    if(Client.DEBUG_MODE){
-                        System.out.printf("- %d/%d sub-futures completed%n", possibleMoves.size() - futures.size(), possibleMoves.size());
-                    }
+//                    if(Client.DEBUG_MODE){
+//                        System.out.printf("- %d/%d sub-futures completed%n", possibleMoves.size() - futures.size(), possibleMoves.size());
+//                    }
+                }
+
+                if(Client.DEBUG_MODE && futures.isEmpty()){
+                    System.out.printf("Completed %d sub-futures%n", possibleMoves.size());
                 }
             }
         }else{ // process here within active thread

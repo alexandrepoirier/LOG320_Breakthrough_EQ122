@@ -11,7 +11,7 @@ class CPUPlayer
     private long searchStartTime;
     private static final long TIME_LIMIT_MS = 4800;
     private static AtomicBoolean IS_TIME_UP = new AtomicBoolean(false);
-    private static int MAX_SEARCH_DEPTH = 30;
+    private static int MAX_SEARCH_DEPTH = 1000;
 
     ParallelAlphaBeta parallelAlphaBeta;
 
@@ -44,7 +44,7 @@ class CPUPlayer
         ArrayList<Move> moves = generateBestMoves(board);
 
         // not sure this is really needed, on va le garder au cas où
-        //parallelAlphaBeta.cleanupMap();
+        parallelAlphaBeta.cleanupMap();
 
         if(Client.DEBUG_MODE){
             System.out.printf("Took %.2f s to get moves%n", (float)(System.currentTimeMillis() - searchStartTime) / 1000.);
@@ -119,13 +119,6 @@ class CPUPlayer
                     }finally{
                         futures.remove(i);
                         i--;
-                    }
-
-                    if(Client.DEBUG_MODE){
-                        System.out.printf("%d/%d futures completed%n", possibleMoves.size() - futures.size(), possibleMoves.size());
-                        if((float)parallelAlphaBeta.executor.getActiveCount()/parallelAlphaBeta.executor.getCorePoolSize() < 0.5) {
-                            System.out.println("Less than 50% threads are active");
-                        }
                     }
                 }
             }

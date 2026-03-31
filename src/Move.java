@@ -37,6 +37,14 @@ class Move
         }
     }
 
+    public static boolean equals(Move m1, Move m2) {
+        return m1.start[0] == m2.start[0]
+                && m1.start[1] == m2.start[1]
+                && m1.end[0] == m2.end[0]
+                && m1.end[1] == m2.end[1]
+                && m1.player == m2.player;
+    }
+
     public boolean isWinningMove() {
         return (player == Mark.R && end[1] == 7) || (player == Mark.B && end[1] == 0);
     }

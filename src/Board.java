@@ -1,5 +1,3 @@
-import java.math.BigInteger;
-
 class Board {
     private Mark[][] board;
     private int size;
@@ -159,9 +157,9 @@ class Board {
         // Poids
         final int P_PIECE = 20;
         final int P_AVANCE = 5;
-        final int P_MENACE = -30;
+        final int P_MENACE = -10;
         final int P_PROTEGE = 10;
-        final int P_MOBILITE = 1;
+        final int P_MOBILITE = 10;
 
         for(int col = 0; col < size; col++){
             for(int row = 0; row < size; row++){
@@ -169,22 +167,23 @@ class Board {
                 if(cell == Mark.EMPTY) continue;
 
                 int val = 0;
+                int av = 0;
 
-                // 1. Avancement (Quadratique pour encourager la fin)
                 if (cell == Mark.R) {
-                    int av = (7 - row);
-                    val += P_PIECE + (av * av * P_AVANCE);
+                    av = (7 - row);
                 } else {
-                    int av = row;
-                    val += P_PIECE + (av * av * P_AVANCE);
+                    av = row;
                 }
 
+                // 1. Avancement (Quadratique pour encourager la fin)
+                val += P_PIECE + (av * av * P_AVANCE);
                 // 2. Sécurité
-                if (estMenace(col, row, cell)) val += P_MENACE;
-                if (estProtege(col, row, cell)) val += P_PROTEGE;
+                if (isThreatened(col, row, cell)) val += P_MENACE * av;
+                if (isProtected(col, row, cell)) val += P_PROTEGE;
+                if (isBlocking(col, row, cell)) val += P_MOBILITE;
 
                 // 3. Mobilité
-                val += compteMobilite(col, row, cell) * P_MOBILITE;
+                val -= compteMobilite(col, row, cell) * P_MOBILITE;
 
                 score += (cell == player) ? val : -val;
             }
@@ -193,20 +192,21 @@ class Board {
         return score;
     }
 
-    private boolean estMenace(int col, int row, Mark moi) {
-        Mark ennemi = (moi == Mark.R) ? Mark.B : Mark.R;
+    private boolean isThreatened(int col, int row, Mark player) {
+        Mark opponent = (player == Mark.R) ? Mark.B : Mark.R;
         // L'ennemi attaque depuis 'devant' lui.
         // Si je suis R (va vers 0), l'ennemi B (va vers 7) est en row-1.
-        int rowSrcEnnemi = (moi == Mark.R) ? row - 1 : row + 1;
+        int rowSrcEnnemi = (player == Mark.R) ? row - 1 : row + 1;
 
         if (rowSrcEnnemi < 0 || rowSrcEnnemi >= size) return false;
 
-        if (col > 0 && board[col-1][rowSrcEnnemi] == ennemi) return true;
-        if (col < size-1 && board[col+1][rowSrcEnnemi] == ennemi) return true;
+        if (col > 0 && board[col-1][rowSrcEnnemi] == opponent) return true;
+        if (col < size-1 && board[col+1][rowSrcEnnemi] == opponent) return true;
+
         return false;
     }
 
-    private boolean estProtege(int col, int row, Mark moi) {
+    private boolean isProtected(int col, int row, Mark moi) {
         // Ami derrière moi
         int rowAmi = (moi == Mark.R) ? row + 1 : row - 1;
 
@@ -214,20 +214,33 @@ class Board {
 
         if (col > 0 && board[col-1][rowAmi] == moi) return true;
         if (col < size-1 && board[col+1][rowAmi] == moi) return true;
+
         return false;
     }
 
-    private int compteMobilite(int col, int row, Mark moi) {
+    private int compteMobilite(int col, int row, Mark player) {
+        Mark opponent = (player == Mark.R) ? Mark.B : Mark.R;
         int mob = 0;
-        int rowDest = (moi == Mark.R) ? row - 1 : row + 1;
+        int rowDest = (player == Mark.R) ? row - 1 : row + 1;
 
         if (rowDest < 0 || rowDest >= size) return 0;
 
         if (board[col][rowDest] == Mark.EMPTY) mob++;
-        if (col > 0 && board[col-1][rowDest] != moi) mob++; // Manger ou bouger
-        if (col < size-1 && board[col+1][rowDest] != moi) mob++;
+        if (col > 0 && board[col-1][rowDest] == Mark.EMPTY) mob++;
+        if (col > 0 && board[col-1][rowDest] == opponent) mob+=2;
+        if (col < size-1 && board[col+1][rowDest] == Mark.EMPTY) mob++;
+        if (col < size-1 && board[col+1][rowDest] == opponent) mob+=2;
 
         return mob;
+    }
+
+    private boolean isBlocking(int col, int row, Mark player) {
+        // favorise de continuer à bloquer une pièce
+        Mark opponent = (player == Mark.R) ? Mark.B : Mark.R;
+        int rowDest = (player == Mark.R) ? row - 1 : row + 1;
+        if (rowDest < 0 || rowDest >= size) return false;
+        if(board[col][rowDest] == opponent) return true;
+        return false;
     }
 
     public int evaluate(Mark player, Mark opponent) {

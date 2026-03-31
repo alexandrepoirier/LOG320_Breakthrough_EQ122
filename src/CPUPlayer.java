@@ -11,7 +11,7 @@ class CPUPlayer
     private long searchStartTime;
     private static final long TIME_LIMIT_MS = 4800;
     private static AtomicBoolean IS_TIME_UP = new AtomicBoolean(false);
-    private static int MAX_SEARCH_DEPTH = 1000;
+    private static int MAX_SEARCH_DEPTH = 100;
 
     ParallelAlphaBeta parallelAlphaBeta;
 
@@ -64,7 +64,7 @@ class CPUPlayer
         // order moves by best to worst
         possibleMoves.sort((Move m1, Move m2) -> {
             if(m1.isWinningMove() != m2.isWinningMove()){ return m1.isWinningMove() ? 1 : -1; }
-            if(m1.isWinningMove() != m2.isWinningMove()){ return m1.isEatingMove() ? 1 : -1; }
+            if(m1.isEatingMove() != m2.isEatingMove()){ return m1.isEatingMove() ? 1 : -1; }
             return 0;
         });
 
@@ -125,7 +125,7 @@ class CPUPlayer
 
             if(Client.DEBUG_MODE && completedDepth){
                 System.out.printf("Completed depth : %d, explored %d nodes%n", currentTargetDepth, parallelAlphaBeta.getExploredNodesCount());
-                //System.out.printf("Collision count : %d%n", parallelAlphaBeta.collisions.get());
+//                System.out.printf("Collision count : %d%n", parallelAlphaBeta.collisions.get());
             }
 
             if (completedDepth && !currentBestMoves.isEmpty()) {

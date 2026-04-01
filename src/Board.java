@@ -1,10 +1,10 @@
-import java.math.BigInteger;
 
 class Board {
     private Mark[][] board;
     private int size;
     private int blackCount = 0;
     private int redCount = 0;
+    private long boardHash = 0;
 
     public Board(int n) {
         this.size = n;
@@ -14,6 +14,7 @@ class Board {
                 board[i][j] = Mark.EMPTY;
             }
         }
+        computeHash();
     }
 
     public Board(int n, byte[] boardConfig){
@@ -42,6 +43,7 @@ class Board {
                 y++;
             }
         }
+        computeHash();
     }
 
     public Board(Board b) {
@@ -49,6 +51,7 @@ class Board {
         this.board = new Mark[b.size][b.size];
         this.redCount = b.redCount;
         this.blackCount = b.blackCount;
+        this.boardHash = b.boardHash;
 
         for (int row = 0; row < b.size; row++) {
             System.arraycopy(b.board[row], 0, board[row], 0, b.size);
@@ -67,90 +70,63 @@ class Board {
         return true;
     }
 
-    public int algo1(Mark player, Mark opponent){
-        if (hasWon(player)) {
-            return Scoring.WIN_SCORE;
-        }
-        if (hasWon(opponent)) {
-            return Scoring.LOSE_SCORE;
-        }
-
-        int score = 0;
-
-        // Optimizing code by pre-filtering player's mark
-        if(player == Mark.R){
-            // Ignore first row to save time
-            for(int col = 0; col < size; col++){
-                for(int row = 0; row < size; row++){
-                    if(board[col][row] == player){
-                        // Reward pieces closer to opponent's zone, which is row 0
-                        score += Scoring.PLAYER_MARK + (7 - row) * Scoring.POS_FACTOR;
-                    } else if(board[col][row] == opponent){
-                        // Opponent mark in player territory is bad
-                        score -= Scoring.OPPONENT_MARK + row * (int)Math.pow(1.1, row) * Scoring.POS_FACTOR;
-                    }
-                }
-            }
-        }else{
-            // Ignore last row to save time
-            for(int col = 0; col < size; col++){
-                for(int row = 0; row < size; row++){
-                    if(board[col][row] == player){
-                        // Reward pieces closer to opponent's zone, which is row 8
-                        score += Scoring.PLAYER_MARK + row * Scoring.POS_FACTOR;
-                    } else if(board[col][row] == opponent){
-                        score -= Scoring.OPPONENT_MARK + (7 - row) * (int)Math.pow(1.1, (7-row)) * Scoring.POS_FACTOR;
-                    }
-                }
-            }
-        }
-
-        return score;
-    }
-
-    public int algo2(Mark player, Mark opponent){
-        if (hasWon(player)) {
-            return Scoring.WIN_SCORE;
-        }
-        if (hasWon(opponent)) {
-            return Scoring.LOSE_SCORE;
-        }
-
-        int score = 0;
-
-        // Optimizing code by pre-filtering player's mark
-        if(player == Mark.R){
-            // Ignore first row to save time
-            for(int col = 0; col < size; col++){
-                for(int row = 0; row < size; row++){
-                    if(board[col][row] == player){
-                        // Reward pieces closer to opponent's zone, which is row 0
-                        score += Scoring.PLAYER_MARK + (7 - row) * Scoring.POS_FACTOR;
-                    } else if(board[col][row] == opponent){
-                        // Opponent mark in player territory is bad
-                        score -= Scoring.OPPONENT_MARK + row * Scoring.POS_FACTOR;
-                    }
-                }
-            }
-        }else{
-            // Ignore last row to save time
-            for(int col = 0; col < size; col++){
-                for(int row = 0; row < size; row++){
-                    if(board[col][row] == player){
-                        // Reward pieces closer to opponent's zone, which is row 8
-                        score += Scoring.PLAYER_MARK + row * Scoring.POS_FACTOR;
-                    } else if(board[col][row] == opponent){
-                        score -= Scoring.OPPONENT_MARK + (7 - row) * Scoring.POS_FACTOR;
-                    }
-                }
-            }
-        }
-
-        return score;
-    }
-
     public int evaluate(Mark player, Mark opponent) {
-        return algo2(player, opponent);
+        if (hasWon(player)) return Scoring.WIN_SCORE;
+        if (hasWon(opponent)) return Scoring.LOSE_SCORE;
+
+        int score = 0;
+
+        for (int col = 0; col < size; col++) {
+            for (int row = 0; row < size; row++) {
+                Mark cell = board[col][row];
+                if (cell == Mark.EMPTY) continue;
+
+                boolean isPlayer = (cell == player);
+                Mark enemy = isPlayer ? opponent : player;
+                int dir = (cell == Mark.R) ? -1 : 1;
+                int goalRow = (cell == Mark.R) ? 0 : 7;
+                int distToGoal = Math.abs(row - goalRow);
+
+                int val = 15; // base piece value
+
+                // 1. Advancement — linear, modest reward
+                val += (7 - distToGoal) * 4;
+
+                // 2. Safety
+                int frontRow = row + dir;
+                boolean threatened = false;
+                if (frontRow >= 0 && frontRow < size) {
+                    if (col > 0 && board[col - 1][frontRow] == enemy) threatened = true;
+                    if (col < size - 1 && board[col + 1][frontRow] == enemy) threatened = true;
+                }
+
+                int backRow = row - dir;
+                boolean protectedByAlly = false;
+                if (backRow >= 0 && backRow < size) {
+                    if (col > 0 && board[col - 1][backRow] == cell) protectedByAlly = true;
+                    if (col < size - 1 && board[col + 1][backRow] == cell) protectedByAlly = true;
+                }
+
+                if (threatened && !protectedByAlly) {
+                    val -= 50;
+                } else if (threatened && protectedByAlly) {
+                    val -= 15;
+                }
+
+                if (protectedByAlly) {
+                    val += 12;
+                }
+
+                score += isPlayer ? val : -val;
+            }
+        }
+
+        // Material advantage
+        int playerCount = (player == Mark.R) ? redCount : blackCount;
+        int opponentCount = (player == Mark.R) ? blackCount : redCount;
+        score += (playerCount - opponentCount) * 20;
+
+        return score;
     }
     
     public boolean hasWon(Mark player) {
@@ -177,10 +153,22 @@ class Board {
         return false;
     }
 
+    // Simple hash: each cell contributes (col * 8 + row) mapped to a unique factor
+    private static long cellHash(int col, int row, Mark mark) {
+        return (long) mark.value() * (col * 8 + row + 1) * 31L;
+    }
+
     public void play(Move m){
+        // Remove old hash contributions, add new ones
+        boardHash -= cellHash(m.getStartCol(), m.getStartRow(), m.getPlayer());
+        boardHash -= cellHash(m.getEndCol(), m.getEndRow(), board[m.getEndCol()][m.getEndRow()]);
+
         m.setTarget(board[m.getEndCol()][m.getEndRow()]);
         board[m.getEndCol()][m.getEndRow()] = m.getPlayer();
         board[m.getStartCol()][m.getStartRow()] = Mark.EMPTY;
+
+        boardHash += cellHash(m.getEndCol(), m.getEndRow(), m.getPlayer());
+        boardHash += cellHash(m.getStartCol(), m.getStartRow(), Mark.EMPTY);
 
         if(m.getTarget() == Mark.B){
             blackCount--;
@@ -190,8 +178,14 @@ class Board {
     }
 
     public void undoMove(Move m) {
+        boardHash -= cellHash(m.getEndCol(), m.getEndRow(), m.getPlayer());
+        boardHash -= cellHash(m.getStartCol(), m.getStartRow(), Mark.EMPTY);
+
         board[m.getEndCol()][m.getEndRow()] = m.getTarget();
         board[m.getStartCol()][m.getStartRow()] = m.getPlayer();
+
+        boardHash += cellHash(m.getStartCol(), m.getStartRow(), m.getPlayer());
+        boardHash += cellHash(m.getEndCol(), m.getEndRow(), m.getTarget());
 
         if(m.getTarget() == Mark.B){
             blackCount++;
@@ -204,16 +198,27 @@ class Board {
         return board;
     }
 
-    public long generateUniqueId() {
-        long id = 0;
-
-        for(int row = 0; row < size; row++){
-            long rowPower = (long)Math.pow(31, row);
-            for(int col = 0; col < size; col++){
-                id += (board[col][row].value() * (long)Math.pow(13, col) * rowPower) % 4611686018427388039L;
+    public void recount() {
+        redCount = 0;
+        blackCount = 0;
+        for (int i = 0; i < size; i++) {
+            for (int j = 0; j < size; j++) {
+                if (board[i][j] == Mark.R) redCount++;
+                else if (board[i][j] == Mark.B) blackCount++;
             }
         }
+    }
 
-        return id;
+    public long generateUniqueId() {
+        return boardHash;
+    }
+
+    private void computeHash() {
+        boardHash = 0;
+        for (int col = 0; col < size; col++) {
+            for (int row = 0; row < size; row++) {
+                boardHash += cellHash(col, row, board[col][row]);
+            }
+        }
     }
 }

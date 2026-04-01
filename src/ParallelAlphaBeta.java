@@ -93,7 +93,7 @@ public class ParallelAlphaBeta {
         long boardId = board.generateUniqueId();
         BoardScoreEntry scoreEntry = scoreMap.get(boardId);
 
-        if (IS_TIME_UP.get()) {
+        if (IS_TIME_UP.get() || Thread.currentThread().isInterrupted()) {
             return 0;
         }
 

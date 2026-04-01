@@ -9,7 +9,7 @@ class CPUPlayer
     private final Mark opponentMark;
 
     private long searchStartTime;
-    private static final long TIME_LIMIT_MS = 4800;
+    private static final long TIME_LIMIT_MS = 4400;
     private static AtomicBoolean IS_TIME_UP = new AtomicBoolean(false);
 
     ParallelAlphaBeta parallelAlphaBeta;
@@ -85,11 +85,15 @@ class CPUPlayer
             ArrayList<Future<Move>> futures = parallelAlphaBeta.submit(board, possibleMoves, currentTargetDepth, Integer.MIN_VALUE, Integer.MAX_VALUE);
 
             int i = -1;
-            while(futures.size() > 0){
+            while(!futures.isEmpty()){
                 i = (i+1)%futures.size();
 
                 if(isTimeUp()){
                     completedDepth = false;
+                    // Cancel remaining futures so threads stop faster
+                    for (Future<Move> f : futures) {
+                        f.cancel(true);
+                    }
                     break;
                 }
 

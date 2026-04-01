@@ -76,7 +76,7 @@ class CPUPlayer
         while (!isTimeUp()) {
             // Reorder moves after getting scores from first iteration
             if (currentTargetDepth > 1){
-                possibleMoves.sort(Comparator.comparingInt(Move::getScore));
+                possibleMoves.sort((a, b) -> b.getScore() - a.getScore());
             }
 
             ArrayList<Move> currentBestMoves = new ArrayList<Move>();

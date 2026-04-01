@@ -40,10 +40,8 @@ class CPUPlayer
     public Move getBestMove(Board board){
         IS_TIME_UP.set(false);
         searchStartTime = System.currentTimeMillis();
+        parallelAlphaBeta.scoreMap.clear();
         ArrayList<Move> moves = generateBestMoves(board);
-
-        // not sure this is really needed, on va le garder au cas où
-        //parallelAlphaBeta.cleanupMap();
 
         if(Client.DEBUG_MODE){
             System.out.printf("Took %.2f s to get moves%n", (float)(System.currentTimeMillis() - searchStartTime) / 1000.);
@@ -62,8 +60,8 @@ class CPUPlayer
 
         // order moves by best to worst
         possibleMoves.sort((Move m1, Move m2) -> {
-            if(m1.isWinningMove() != m2.isWinningMove()){ return m1.isWinningMove() ? 1 : -1; }
-            if(m1.isWinningMove() != m2.isWinningMove()){ return m1.isEatingMove() ? 1 : -1; }
+            if(m1.isWinningMove() != m2.isWinningMove()){ return m1.isWinningMove() ? -1 : 1; }
+            if(m1.isEatingMove() != m2.isEatingMove()){ return m1.isEatingMove() ? -1 : 1; }
             return 0;
         });
 
@@ -76,7 +74,7 @@ class CPUPlayer
         while (!isTimeUp()) {
             // Reorder moves after getting scores from first iteration
             if (currentTargetDepth > 1){
-                possibleMoves.sort(Comparator.comparingInt(Move::getScore));
+                possibleMoves.sort((a, b) -> b.getScore() - a.getScore());
             }
 
             ArrayList<Move> currentBestMoves = new ArrayList<Move>();
@@ -92,7 +90,6 @@ class CPUPlayer
 
                 if(isTimeUp()){
                     completedDepth = false;
-                    // Cancel remaining futures so threads stop faster
                     for (Future<Move> f : futures) {
                         f.cancel(true);
                     }

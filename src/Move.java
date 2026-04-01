@@ -38,7 +38,7 @@ class Move
     }
 
     public boolean isWinningMove() {
-        return (player == Mark.R && end[1] == 7) || (player == Mark.B && end[1] == 0);
+        return (player == Mark.R && end[1] == 0) || (player == Mark.B && end[1] == 7);
     }
 
     public boolean isEatingMove() {

@@ -13,7 +13,7 @@ public class ParallelAlphaBeta {
     //public AtomicInteger collisions = new AtomicInteger(0);
     private final Mark cpuMark;
     private final Mark opponentMark;
-    ConcurrentHashMap<Long, BoardScoreEntry> scoreMap =  new ConcurrentHashMap<>((int)20E6);
+    ConcurrentHashMap<Long, BoardScoreEntry> scoreMap = new ConcurrentHashMap<>(1_000_000);
     //ConcurrentHashMap<Long, Board> boardKeyMap = new ConcurrentHashMap<>((int)20E6);
 
     public ParallelAlphaBeta(int maxThreads, Mark cpuMark, Mark opponentMark, AtomicBoolean isTimeUp) {
@@ -25,7 +25,6 @@ public class ParallelAlphaBeta {
 
     public ArrayList<Future<Move>> submit(Board board, ArrayList<Move> moves, int targetDepth, int alpha, int beta) {
         exploredNodesCount.set(0);
-        //collisions.set(0);
 
         ArrayList<Future<Move>> futures = new ArrayList<>();
 
@@ -85,22 +84,36 @@ public class ParallelAlphaBeta {
             return 0;
         }
 
-        // Early exit — win/loss
         if (board.hasWon(cpuMark)) return Scoring.WIN_SCORE;
         if (board.hasWon(opponentMark)) return Scoring.LOSE_SCORE;
 
-        // Terminal node — evaluate
-        if (localDepth >= targetDepth) {
+        int remainingDepth = targetDepth - localDepth;
+
+        // TT lookup
+        long boardId = board.generateUniqueId();
+        BoardScoreEntry entry = scoreMap.get(boardId);
+        if (entry != null && entry.depth >= remainingDepth) {
+            if (entry.nodeType == BoardScoreEntry.NodeType.EXACT) {
+                return entry.value;
+            } else if (entry.nodeType == BoardScoreEntry.NodeType.MAX) {
+                alpha = Math.max(alpha, entry.value);
+            } else if (entry.nodeType == BoardScoreEntry.NodeType.MIN) {
+                beta = Math.min(beta, entry.value);
+            }
+            if (alpha >= beta) return entry.value;
+        }
+
+        if (remainingDepth <= 0) {
             return board.evaluate(cpuMark, opponentMark);
         }
 
-        // Generate and order moves
         ArrayList<Move> possibleMoves = MoveGenerator.getPossibleMoves(board, isMaximizing ? cpuMark : opponentMark);
 
         if (possibleMoves.isEmpty()) {
             return isMaximizing ? Integer.MIN_VALUE + localDepth : Integer.MAX_VALUE - localDepth;
         }
 
+        int originalAlpha = alpha;
         int optimalScore = isMaximizing ? Integer.MIN_VALUE : Integer.MAX_VALUE;
 
         for (Move move : possibleMoves) {
@@ -119,6 +132,23 @@ public class ParallelAlphaBeta {
             }
 
             if (beta <= alpha) break;
+        }
+
+        // TT store
+        if (!IS_TIME_UP.get()) {
+            BoardScoreEntry.NodeType type;
+            if (optimalScore <= originalAlpha) {
+                type = BoardScoreEntry.NodeType.MIN;
+            } else if (optimalScore >= beta) {
+                type = BoardScoreEntry.NodeType.MAX;
+            } else {
+                type = BoardScoreEntry.NodeType.EXACT;
+            }
+
+            BoardScoreEntry existing = scoreMap.get(boardId);
+            if (existing == null || remainingDepth >= existing.depth) {
+                scoreMap.put(boardId, new BoardScoreEntry(optimalScore, type, remainingDepth));
+            }
         }
 
         return optimalScore;

@@ -54,10 +54,10 @@ class Move
 
     private void validateMoveInternal() throws InvalidMoveException{
         // Validate bounds
-        if ( !(start[0] >= 0 && start[0] <= 8
-                && start[1] >= 0 && start[1] <= 8
-                && end[0] >= 0 && end[0] <= 8
-                && end[1] >= 0 && end[1] <= 8)
+        if ( !(start[0] >= 0 && start[0] <= 7
+                && start[1] >= 0 && start[1] <= 7
+                && end[0] >= 0 && end[0] <= 7
+                && end[1] >= 0 && end[1] <= 7)
         )
         {
             throw new InvalidMoveException("Move out of bounds");

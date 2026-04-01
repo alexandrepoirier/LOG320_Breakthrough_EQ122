@@ -79,9 +79,6 @@ class Board {
     }
 
     public int evaluate(Mark player, Mark opponent) {
-        if (hasWon(player)) return Scoring.WIN_SCORE;
-        if (hasWon(opponent)) return Scoring.LOSE_SCORE;
-
         int score = 0;
         int playerFrontDist = 7;
         int opponentFrontDist = 7;

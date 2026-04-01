@@ -10,11 +10,9 @@ public class ParallelAlphaBeta {
     ExecutorService executor;
     private AtomicBoolean IS_TIME_UP;
     private final AtomicInteger exploredNodesCount = new AtomicInteger(0);
-    //public AtomicInteger collisions = new AtomicInteger(0);
     private final Mark cpuMark;
     private final Mark opponentMark;
     ConcurrentHashMap<Long, BoardScoreEntry> scoreMap = new ConcurrentHashMap<>(1_000_000);
-    //ConcurrentHashMap<Long, Board> boardKeyMap = new ConcurrentHashMap<>((int)20E6);
 
     public ParallelAlphaBeta(int maxThreads, Mark cpuMark, Mark opponentMark, AtomicBoolean isTimeUp) {
         executor = Executors.newFixedThreadPool(maxThreads);
@@ -23,8 +21,11 @@ public class ParallelAlphaBeta {
         IS_TIME_UP = isTimeUp;
     }
 
+    private final AtomicInteger sharedAlpha = new AtomicInteger(Integer.MIN_VALUE);
+
     public ArrayList<Future<Move>> submit(Board board, ArrayList<Move> moves, int targetDepth, int alpha, int beta) {
         exploredNodesCount.set(0);
+        sharedAlpha.set(alpha);
 
         ArrayList<Future<Move>> futures = new ArrayList<>();
 
@@ -32,43 +33,15 @@ public class ParallelAlphaBeta {
             futures.add(executor.submit(() -> {
                 Board threadBoard = new Board(board);
                 threadBoard.play(move);
-                int score = alphaBetaInternal(threadBoard, false, 0, targetDepth, alpha, beta);
+                int threadAlpha = Math.max(alpha, sharedAlpha.get());
+                int score = alphaBetaInternal(threadBoard, false, 0, targetDepth, threadAlpha, beta);
+                sharedAlpha.updateAndGet(current -> Math.max(current, score));
                 move.setScore(score);
                 return move;
             }));
         }
 
         return futures;
-    }
-
-    public void cleanupMap(){
-        executor.submit(() ->{
-            if(Client.DEBUG_MODE){
-                System.out.println("Cleaning up map...");
-            }
-
-            ArrayList<Long> toRemove = new ArrayList<>();
-            scoreMap.forEach( (k,v) -> {
-                if(v.depth <= 4){
-                    toRemove.add(k);
-                }
-            });
-
-            if(Client.DEBUG_MODE){
-                System.out.printf("Found %d elements to remove%n",  toRemove.size());
-            }
-
-            for(Long k : toRemove){
-                if(GameState.getState() != GameState.State.WAITING){
-                    break;
-                }
-                scoreMap.remove(k);
-            }
-
-            if(Client.DEBUG_MODE){
-                System.out.println("Done cleaning map");
-            }
-        });
     }
 
     public int getExploredNodesCount() {
@@ -112,6 +85,17 @@ public class ParallelAlphaBeta {
         if (possibleMoves.isEmpty()) {
             return isMaximizing ? Integer.MIN_VALUE + localDepth : Integer.MAX_VALUE - localDepth;
         }
+
+        // Order moves by TT scores without mutating move targets
+        for (Move move : possibleMoves) {
+            Mark dest = board.getBoard()[move.getEndCol()][move.getEndRow()];
+            long childHash = BoardHash.updatePlay(board.generateUniqueId(),
+                    move.getStartCol(), move.getStartRow(), move.getPlayer(),
+                    move.getEndCol(), move.getEndRow(), dest);
+            BoardScoreEntry childEntry = scoreMap.get(childHash);
+            move.setScore(childEntry != null ? childEntry.value : 0);
+        }
+        possibleMoves.sort((a, b) -> isMaximizing ? b.getScore() - a.getScore() : a.getScore() - b.getScore());
 
         int originalAlpha = alpha;
         int optimalScore = isMaximizing ? Integer.MIN_VALUE : Integer.MAX_VALUE;

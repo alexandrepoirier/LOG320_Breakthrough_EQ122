@@ -56,6 +56,7 @@ class Client {
 						break;
 					case '\uFFFF':
 						GameState.setState(GameState.State.TERMINATED);
+						break;
 				}
 			}
 		}
@@ -180,7 +181,9 @@ class Client {
 		return true;
 	}
 
-	private static void GameOver() {
+	private static void GameOver() throws IOException {
+		input.readAllBytes(); // flush input
+
 		GameState.setState(GameState.State.OVER);
 
 		if (DEBUG_MODE){

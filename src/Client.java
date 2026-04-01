@@ -37,6 +37,7 @@ class Client {
 				switch (cmd){
 					case '0':
 						GameState.setState(GameState.State.TERMINATED);
+						break;
 					case '1':
 						BeginGameAsRed();
 						break;

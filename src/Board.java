@@ -221,12 +221,23 @@ class Board {
         }
     }
 
+    private static final long[] POW13 = new long[8];
+    private static final long[] POW31 = new long[8];
+    private static final long MOD = 4611686018427388039L;
+    static {
+        POW13[0] = 1; POW31[0] = 1;
+        for (int i = 1; i < 8; i++) {
+            POW13[i] = POW13[i - 1] * 13;
+            POW31[i] = POW31[i - 1] * 31;
+        }
+    }
+
     public long generateUniqueId() {
         long id = 0;
         for (int row = 0; row < size; row++) {
-            long rowPower = (long) Math.pow(31, row);
+            long rp = POW31[row];
             for (int col = 0; col < size; col++) {
-                id += (board[col][row].value() * (long) Math.pow(13, col) * rowPower) % 4611686018427388039L;
+                id += (board[col][row].value() * POW13[col] * rp) % MOD;
             }
         }
         return id;

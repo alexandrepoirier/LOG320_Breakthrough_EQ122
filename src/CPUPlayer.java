@@ -62,8 +62,8 @@ class CPUPlayer
 
         // order moves by best to worst
         possibleMoves.sort((Move m1, Move m2) -> {
-            if(m1.isWinningMove() != m2.isWinningMove()){ return m1.isWinningMove() ? 1 : -1; }
-            if(m1.isWinningMove() != m2.isWinningMove()){ return m1.isEatingMove() ? 1 : -1; }
+            if(m1.isWinningMove() != m2.isWinningMove()){ return m1.isWinningMove() ? -1 : 1; }
+            if(m1.isEatingMove() != m2.isEatingMove()){ return m1.isEatingMove() ? -1 : 1; }
             return 0;
         });
 

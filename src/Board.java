@@ -1,10 +1,10 @@
+import java.math.BigInteger;
 
 class Board {
     private Mark[][] board;
     private int size;
     private int blackCount = 0;
     private int redCount = 0;
-    private long boardHash = 0;
 
     public Board(int n) {
         this.size = n;
@@ -14,7 +14,6 @@ class Board {
                 board[i][j] = Mark.EMPTY;
             }
         }
-        computeHash();
     }
 
     public Board(int n, byte[] boardConfig){
@@ -43,7 +42,6 @@ class Board {
                 y++;
             }
         }
-        computeHash();
     }
 
     public Board(Board b) {
@@ -51,7 +49,6 @@ class Board {
         this.board = new Mark[b.size][b.size];
         this.redCount = b.redCount;
         this.blackCount = b.blackCount;
-        this.boardHash = b.boardHash;
 
         for (int row = 0; row < b.size; row++) {
             System.arraycopy(b.board[row], 0, board[row], 0, b.size);
@@ -153,22 +150,10 @@ class Board {
         return false;
     }
 
-    // Simple hash: each cell contributes (col * 8 + row) mapped to a unique factor
-    private static long cellHash(int col, int row, Mark mark) {
-        return (long) mark.value() * (col * 8 + row + 1) * 31L;
-    }
-
     public void play(Move m){
-        // Remove old hash contributions, add new ones
-        boardHash -= cellHash(m.getStartCol(), m.getStartRow(), m.getPlayer());
-        boardHash -= cellHash(m.getEndCol(), m.getEndRow(), board[m.getEndCol()][m.getEndRow()]);
-
         m.setTarget(board[m.getEndCol()][m.getEndRow()]);
         board[m.getEndCol()][m.getEndRow()] = m.getPlayer();
         board[m.getStartCol()][m.getStartRow()] = Mark.EMPTY;
-
-        boardHash += cellHash(m.getEndCol(), m.getEndRow(), m.getPlayer());
-        boardHash += cellHash(m.getStartCol(), m.getStartRow(), Mark.EMPTY);
 
         if(m.getTarget() == Mark.B){
             blackCount--;
@@ -178,14 +163,8 @@ class Board {
     }
 
     public void undoMove(Move m) {
-        boardHash -= cellHash(m.getEndCol(), m.getEndRow(), m.getPlayer());
-        boardHash -= cellHash(m.getStartCol(), m.getStartRow(), Mark.EMPTY);
-
         board[m.getEndCol()][m.getEndRow()] = m.getTarget();
         board[m.getStartCol()][m.getStartRow()] = m.getPlayer();
-
-        boardHash += cellHash(m.getStartCol(), m.getStartRow(), m.getPlayer());
-        boardHash += cellHash(m.getEndCol(), m.getEndRow(), m.getTarget());
 
         if(m.getTarget() == Mark.B){
             blackCount++;
@@ -198,27 +177,16 @@ class Board {
         return board;
     }
 
-    public void recount() {
-        redCount = 0;
-        blackCount = 0;
-        for (int i = 0; i < size; i++) {
-            for (int j = 0; j < size; j++) {
-                if (board[i][j] == Mark.R) redCount++;
-                else if (board[i][j] == Mark.B) blackCount++;
-            }
-        }
-    }
-
     public long generateUniqueId() {
-        return boardHash;
-    }
+        long id = 0;
 
-    private void computeHash() {
-        boardHash = 0;
-        for (int col = 0; col < size; col++) {
-            for (int row = 0; row < size; row++) {
-                boardHash += cellHash(col, row, board[col][row]);
+        for(int row = 0; row < size; row++){
+            long rowPower = (long)Math.pow(31, row);
+            for(int col = 0; col < size; col++){
+                id += (board[col][row].value() * (long)Math.pow(13, col) * rowPower) % 4611686018427388039L;
             }
         }
+
+        return id;
     }
 }

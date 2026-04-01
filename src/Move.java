@@ -37,6 +37,14 @@ class Move
         }
     }
 
+    public static boolean equals(Move m1, Move m2) {
+        return m1.start[0] == m2.start[0]
+                && m1.start[1] == m2.start[1]
+                && m1.end[0] == m2.end[0]
+                && m1.end[1] == m2.end[1]
+                && m1.player == m2.player;
+    }
+
     public boolean isWinningMove() {
         return (player == Mark.R && end[1] == 7) || (player == Mark.B && end[1] == 0);
     }
@@ -46,7 +54,6 @@ class Move
     }
 
     private void setMoveInternal(char[] start, char[] end) throws InvalidMoveException{
-        if (Client.DEBUG_MODE) System.out.println(String.format("Called : setMove(%c%c, %c%c)", start[0], start[1], end[0], end[1]));
         this.start = new byte[] {(byte)(start[0] - 65), (byte)(7-(start[1] - 49))};
         this.end = new byte[] {(byte)(end[0] - 65), (byte)(7-(end[1] - 49))};
         validateMoveInternal();

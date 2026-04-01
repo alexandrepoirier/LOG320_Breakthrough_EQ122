@@ -3,11 +3,13 @@ import java.util.ArrayList;
 public class MoveGenerator {
     public static ArrayList<Move> getPossibleMoves(Board board, Mark mark){
         ArrayList<Move> possibleMoves = new ArrayList<>();
+
         if(mark == Mark.R){
             possibleMoves = getPossibleRedMoves(board);
         } else if (mark == Mark.B) {
             possibleMoves = getPossibleBlackMoves(board);
         }
+
         return possibleMoves;
     }
 
@@ -32,7 +34,7 @@ public class MoveGenerator {
             if(board.getBoard()[col][row+1] == Mark.EMPTY){
                 possibleMoves.add(new Move(new byte[]{(byte)col, (byte)row}, new byte[] {(byte)(col), (byte)(row+1)}, Mark.B));
             }
-            if(col+1 <= 7 &&board.getBoard()[col+1][row+1] != Mark.B){
+            if(col+1 <= 7 && board.getBoard()[col+1][row+1] != Mark.B){
                 possibleMoves.add(new Move(new byte[]{(byte)col, (byte)row}, new byte[] {(byte)(col+1), (byte)(row+1)}, Mark.B));
             }
         }
@@ -54,13 +56,13 @@ public class MoveGenerator {
     private static ArrayList<Move> getRedMove(Board board, int col,int row) {
         ArrayList<Move> possibleMoves = new ArrayList<>();
         if(row <= 7 && row > 0){
-            if(col - 1 >=0 && board.getBoard()[col-1][row-1] != Mark.R){
+            if(col - 1 >= 0 && board.getBoard()[col-1][row-1] != Mark.R){
                 possibleMoves.add(new Move(new byte[]{(byte)col, (byte)row}, new byte[] {(byte)(col-1), (byte)(row-1)}, Mark.R));
             }
             if(board.getBoard()[col][row-1] == Mark.EMPTY){
                 possibleMoves.add(new Move(new byte[]{(byte)col, (byte)row}, new byte[] {(byte)(col), (byte)(row-1)}, Mark.R));
             }
-            if(col+1 <= 7 &&board.getBoard()[col+1][row-1] != Mark.R){
+            if(col+1 <= 7 && board.getBoard()[col+1][row-1] != Mark.R){
                 possibleMoves.add(new Move(new byte[]{(byte)col, (byte)row}, new byte[] {(byte)(col+1), (byte)(row-1)}, Mark.R));
             }
         }

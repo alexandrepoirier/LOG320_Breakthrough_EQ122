@@ -11,6 +11,7 @@ class CPUPlayer
     private long searchStartTime;
     private static final long TIME_LIMIT_MS = 4400;
     private static AtomicBoolean IS_TIME_UP = new AtomicBoolean(false);
+    private static int MAX_SEARCH_DEPTH = 100;
 
     ParallelAlphaBeta parallelAlphaBeta;
 
@@ -63,7 +64,7 @@ class CPUPlayer
         // order moves by best to worst
         possibleMoves.sort((Move m1, Move m2) -> {
             if(m1.isWinningMove() != m2.isWinningMove()){ return m1.isWinningMove() ? 1 : -1; }
-            if(m1.isWinningMove() != m2.isWinningMove()){ return m1.isEatingMove() ? 1 : -1; }
+            if(m1.isEatingMove() != m2.isEatingMove()){ return m1.isEatingMove() ? 1 : -1; }
             return 0;
         });
 
@@ -82,7 +83,9 @@ class CPUPlayer
             bestScore = Integer.MIN_VALUE;
             completedDepth = true;
 
-            ArrayList<Future<Move>> futures = parallelAlphaBeta.submit(board, possibleMoves, currentTargetDepth, Integer.MIN_VALUE, Integer.MAX_VALUE);
+            ArrayList<Future<Move>> futures = parallelAlphaBeta.submit(board, possibleMoves, currentTargetDepth,
+                    Integer.MIN_VALUE, Integer.MAX_VALUE,
+                    Client.getTurnCount());
 
             int i = -1;
             while(!futures.isEmpty()){
@@ -90,10 +93,6 @@ class CPUPlayer
 
                 if(isTimeUp()){
                     completedDepth = false;
-                    // Cancel remaining futures so threads stop faster
-                    for (Future<Move> f : futures) {
-                        f.cancel(true);
-                    }
                     break;
                 }
 
@@ -114,6 +113,7 @@ class CPUPlayer
                         // Suck it
                     }finally{
                         futures.remove(i);
+                        i--;
                     }
                 }
             }
@@ -130,7 +130,14 @@ class CPUPlayer
                     break;
                 }
             }
-            
+
+            if(currentTargetDepth == MAX_SEARCH_DEPTH){
+                if(Client.DEBUG_MODE){
+                    System.out.println("Reached max search depth");
+                }
+                break;
+            }
+
             currentTargetDepth++;
         }
 

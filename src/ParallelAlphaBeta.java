@@ -179,20 +179,20 @@ public class ParallelAlphaBeta {
         if(getThreadPoolActivityRatio() <= 0.6
                 && CAN_SUB_THREAD.get()
                 && executor.getQueue().isEmpty()
-        ){
+        ) {
             ArrayList<Future<Move>> futures = submitInternal(board, possibleMoves, localDepth + 1,
                     alpha, beta, false, turn);
 
-            if(Client.DEBUG_MODE){
+            if (Client.DEBUG_MODE) {
                 System.out.printf("Starting %d sub-threads%n", futures.size());
             }
 
             int i = -1;
-            while(futures.size() > 0){
-                i = (i+1)%futures.size();
+            while (!futures.isEmpty()) {
+                i = (i + 1) % futures.size();
 
-                if(IS_TIME_UP.get()){
-                    for(Future f : futures){
+                if (IS_TIME_UP.get()) {
+                    for (Future f : futures) {
                         f.cancel(true);
                     }
 
@@ -201,6 +201,33 @@ public class ParallelAlphaBeta {
 
                 Future<Move> future = futures.get(i);
 
+                if(future.isDone()){
+                    try{
+                        Move move = future.get();
+
+                        if(isMaximizing) {
+                            optimalScore = Math.max(optimalScore, move.getScore());
+                            alpha = Math.max(alpha, optimalScore);
+                        }else {
+                            optimalScore = Math.min(optimalScore, move.getScore());
+                            beta = Math.min(beta, optimalScore);
+                        }
+
+                        if (beta <= alpha) {
+                            for (Future f : futures) {
+                                f.cancel(true);
+                            }
+                            break;
+                        }
+                    }catch(Exception e){
+                        // Suck it
+                    }finally{
+                        futures.remove(i);
+                        i--;
+                    }
+                }
+            }
+        }else{
             for (Move move : possibleMoves) {
                 if (IS_TIME_UP.get()) {
                     break;

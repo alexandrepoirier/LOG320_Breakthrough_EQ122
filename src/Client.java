@@ -16,7 +16,7 @@ class Client {
 	private static CPUPlayer TheDominator;
 	private static final AtomicInteger turnCount = new AtomicInteger(0);
 
-	public static final boolean DEBUG_MODE = false;
+	public static final boolean DEBUG_MODE = true;
 	public static PlayMode PLAY_MODE = PlayMode.CPU;
 
 	public static void main(String[] args) {

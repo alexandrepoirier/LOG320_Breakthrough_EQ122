@@ -85,16 +85,13 @@ public class ParallelAlphaBeta {
             return 0;
         }
 
-        // Early exit — win/loss
         if (board.hasWon(cpuMark)) return Scoring.WIN_SCORE;
         if (board.hasWon(opponentMark)) return Scoring.LOSE_SCORE;
 
-        // Terminal node — evaluate
         if (localDepth >= targetDepth) {
             return board.evaluate(cpuMark, opponentMark);
         }
 
-        // Generate and order moves
         ArrayList<Move> possibleMoves = MoveGenerator.getPossibleMoves(board, isMaximizing ? cpuMark : opponentMark);
 
         if (possibleMoves.isEmpty()) {

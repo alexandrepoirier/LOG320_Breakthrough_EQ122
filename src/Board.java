@@ -71,7 +71,7 @@ class Board {
         if (hasWon(opponent)) return Scoring.LOSE_SCORE;
 
         int score = 0;
-        int playerFrontDist = 7; // distance of most advanced player piece to goal
+        int playerFrontDist = 7;
         int opponentFrontDist = 7;
 
         for (int col = 0; col < size; col++) {
@@ -84,23 +84,17 @@ class Board {
                 int dir = (cell == Mark.R) ? -1 : 1;
                 int distToGoal = (cell == Mark.R) ? row : 7 - row;
 
-                // Track frontrunner
                 if (isPlayer && distToGoal < playerFrontDist) playerFrontDist = distToGoal;
                 if (!isPlayer && distToGoal < opponentFrontDist) opponentFrontDist = distToGoal;
 
                 int val = 10;
 
-                // --- Advancement ---
-                // Quadratic when close (dist <= 2), linear otherwise
-                // This makes the AI aggressive once a piece is near the goal
                 if (distToGoal <= 2) {
                     val += (7 - distToGoal) * (7 - distToGoal) * 3;
                 } else {
                     val += (7 - distToGoal) * 5;
                 }
 
-                // --- Threat detection ---
-                // Enemy captures me by moving diagonally from row - dir
                 int threatRow = row - dir;
                 boolean threatened = false;
                 if (threatRow >= 0 && threatRow < size) {
@@ -108,8 +102,6 @@ class Board {
                     if (col < size - 1 && board[col + 1][threatRow] == enemy) threatened = true;
                 }
 
-                // --- Protection ---
-                // Ally behind me (same row as threat source) can recapture
                 boolean protectedByAlly = false;
                 if (threatRow >= 0 && threatRow < size) {
                     if (col > 0 && board[col - 1][threatRow] == cell) protectedByAlly = true;
@@ -125,32 +117,24 @@ class Board {
                     val += 8;
                 }
 
-                // --- Capture opportunity ---
-                // Can I eat an enemy on my next move?
                 int attackRow = row + dir;
                 if (attackRow >= 0 && attackRow < size) {
                     if (col > 0 && board[col - 1][attackRow] == enemy) val += 25;
                     if (col < size - 1 && board[col + 1][attackRow] == enemy) val += 25;
                 }
 
-                // --- Free path ---
-                // Check if no enemy can intercept this piece on its way to the goal
                 if (distToGoal > 0 && distToGoal <= 4) {
                     boolean free = true;
                     for (int r = row + dir; r >= 0 && r < size; r += dir) {
-                        // Check this column and both adjacent for any enemy
                         if (board[col][r] == enemy) { free = false; break; }
                         if (col > 0 && board[col - 1][r] == enemy) { free = false; break; }
                         if (col < size - 1 && board[col + 1][r] == enemy) { free = false; break; }
                     }
                     if (free) {
-                        // Huge bonus that scales with proximity — unstoppable runner
                         val += (8 - distToGoal) * 25;
                     }
                 }
 
-                // --- Defensive wall ---
-                // Reward pieces on the same row forming a line — blocks enemy from slipping through
                 int homeRow = (cell == Mark.R) ? 7 : 0;
                 int distFromHome = Math.abs(row - homeRow);
                 if (distFromHome >= 2 && distFromHome <= 5) {
@@ -162,17 +146,13 @@ class Board {
             }
         }
 
-        // --- Material ---
         int playerCount = (player == Mark.R) ? redCount : blackCount;
         int opponentCount = (player == Mark.R) ? blackCount : redCount;
         score += (playerCount - opponentCount) * 30;
 
-        // --- Race pressure ---
-        // If our frontrunner is closer to goal than theirs, push hard
         if (playerFrontDist < opponentFrontDist) {
             score += (opponentFrontDist - playerFrontDist) * 20;
         } else if (opponentFrontDist < playerFrontDist) {
-            // They're ahead — play more defensively (already handled by threat penalties)
             score -= (playerFrontDist - opponentFrontDist) * 10;
         }
 

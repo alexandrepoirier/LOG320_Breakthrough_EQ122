@@ -92,7 +92,6 @@ class CPUPlayer
 
                 if(isTimeUp()){
                     completedDepth = false;
-                    // Cancel remaining futures so threads stop faster
                     for (Future<Move> f : futures) {
                         f.cancel(true);
                     }

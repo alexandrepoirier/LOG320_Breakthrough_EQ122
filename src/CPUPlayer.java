@@ -9,7 +9,7 @@ class CPUPlayer
     private final Mark opponentMark;
 
     private long searchStartTime;
-    private static final long TIME_LIMIT_MS = 4400;
+    private static final long TIME_LIMIT_MS = 4650;
     private static AtomicBoolean IS_TIME_UP = new AtomicBoolean(false);
 
     ParallelAlphaBeta parallelAlphaBeta;
@@ -68,6 +68,8 @@ class CPUPlayer
         });
 
         int currentTargetDepth = 1;
+        int maxDepthReached = 0;
+        long totalNodes = 0;
         int bestScore;
         boolean completedDepth;
         
@@ -118,9 +120,9 @@ class CPUPlayer
                 }
             }
 
-            if(Client.DEBUG_MODE && completedDepth){
-                System.out.printf("Completed depth : %d, explored %d nodes%n", currentTargetDepth, parallelAlphaBeta.getExploredNodesCount());
-                //System.out.printf("Collision count : %d%n", parallelAlphaBeta.collisions.get());
+            if (completedDepth && parallelAlphaBeta.getExploredNodesCount() > 0) {
+                maxDepthReached = currentTargetDepth;
+                totalNodes += parallelAlphaBeta.getExploredNodesCount();
             }
 
             if (completedDepth && !currentBestMoves.isEmpty()) {
@@ -132,6 +134,10 @@ class CPUPlayer
             }
             
             currentTargetDepth++;
+        }
+
+        if(Client.DEBUG_MODE){
+            System.out.printf("Max depth: %d, total nodes: %d%n", maxDepthReached, totalNodes);
         }
 
         if (bestMoves.isEmpty() && !possibleMoves.isEmpty()) {

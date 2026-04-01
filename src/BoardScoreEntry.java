@@ -1,8 +1,8 @@
 public class BoardScoreEntry {
     public enum NodeType {
-        TERMINAL,
-        MIN,
-        MAX
+        EXACT,    // exact score
+        MIN,      // upper bound (failed low)
+        MAX       // lower bound (failed high)
     }
 
     int value;

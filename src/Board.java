@@ -4,7 +4,6 @@ class Board {
     private int size;
     private int blackCount = 0;
     private int redCount = 0;
-    private long boardHash = 0;
 
     public Board(int n) {
         this.size = n;
@@ -14,7 +13,6 @@ class Board {
                 board[i][j] = Mark.EMPTY;
             }
         }
-        computeHash();
     }
 
     public Board(int n, byte[] boardConfig){
@@ -43,7 +41,6 @@ class Board {
                 y++;
             }
         }
-        computeHash();
     }
 
     public Board(Board b) {
@@ -51,7 +48,6 @@ class Board {
         this.board = new Mark[b.size][b.size];
         this.redCount = b.redCount;
         this.blackCount = b.blackCount;
-        this.boardHash = b.boardHash;
 
         for (int row = 0; row < b.size; row++) {
             System.arraycopy(b.board[row], 0, board[row], 0, b.size);
@@ -75,6 +71,8 @@ class Board {
         if (hasWon(opponent)) return Scoring.LOSE_SCORE;
 
         int score = 0;
+        int playerFrontDist = 7; // distance of most advanced player piece to goal
+        int opponentFrontDist = 7;
 
         for (int col = 0; col < size; col++) {
             for (int row = 0; row < size; row++) {
@@ -84,47 +82,99 @@ class Board {
                 boolean isPlayer = (cell == player);
                 Mark enemy = isPlayer ? opponent : player;
                 int dir = (cell == Mark.R) ? -1 : 1;
-                int goalRow = (cell == Mark.R) ? 0 : 7;
-                int distToGoal = Math.abs(row - goalRow);
+                int distToGoal = (cell == Mark.R) ? row : 7 - row;
 
-                int val = 15; // base piece value
+                // Track frontrunner
+                if (isPlayer && distToGoal < playerFrontDist) playerFrontDist = distToGoal;
+                if (!isPlayer && distToGoal < opponentFrontDist) opponentFrontDist = distToGoal;
 
-                // 1. Advancement — linear, modest reward
-                val += (7 - distToGoal) * 4;
+                int val = 10;
 
-                // 2. Safety
-                int frontRow = row + dir;
-                boolean threatened = false;
-                if (frontRow >= 0 && frontRow < size) {
-                    if (col > 0 && board[col - 1][frontRow] == enemy) threatened = true;
-                    if (col < size - 1 && board[col + 1][frontRow] == enemy) threatened = true;
+                // --- Advancement ---
+                // Quadratic when close (dist <= 2), linear otherwise
+                // This makes the AI aggressive once a piece is near the goal
+                if (distToGoal <= 2) {
+                    val += (7 - distToGoal) * (7 - distToGoal) * 3;
+                } else {
+                    val += (7 - distToGoal) * 5;
                 }
 
-                int backRow = row - dir;
+                // --- Threat detection ---
+                // Enemy captures me by moving diagonally from row - dir
+                int threatRow = row - dir;
+                boolean threatened = false;
+                if (threatRow >= 0 && threatRow < size) {
+                    if (col > 0 && board[col - 1][threatRow] == enemy) threatened = true;
+                    if (col < size - 1 && board[col + 1][threatRow] == enemy) threatened = true;
+                }
+
+                // --- Protection ---
+                // Ally behind me (same row as threat source) can recapture
                 boolean protectedByAlly = false;
-                if (backRow >= 0 && backRow < size) {
-                    if (col > 0 && board[col - 1][backRow] == cell) protectedByAlly = true;
-                    if (col < size - 1 && board[col + 1][backRow] == cell) protectedByAlly = true;
+                if (threatRow >= 0 && threatRow < size) {
+                    if (col > 0 && board[col - 1][threatRow] == cell) protectedByAlly = true;
+                    if (col < size - 1 && board[col + 1][threatRow] == cell) protectedByAlly = true;
                 }
 
                 if (threatened && !protectedByAlly) {
-                    val -= 50;
+                    val -= 40;
                 } else if (threatened && protectedByAlly) {
-                    val -= 15;
+                    val -= 8;
+                }
+                if (protectedByAlly) {
+                    val += 8;
                 }
 
-                if (protectedByAlly) {
-                    val += 12;
+                // --- Capture opportunity ---
+                // Can I eat an enemy on my next move?
+                int attackRow = row + dir;
+                if (attackRow >= 0 && attackRow < size) {
+                    if (col > 0 && board[col - 1][attackRow] == enemy) val += 25;
+                    if (col < size - 1 && board[col + 1][attackRow] == enemy) val += 25;
+                }
+
+                // --- Free path ---
+                // Check if no enemy can intercept this piece on its way to the goal
+                if (distToGoal > 0 && distToGoal <= 4) {
+                    boolean free = true;
+                    for (int r = row + dir; r >= 0 && r < size; r += dir) {
+                        // Check this column and both adjacent for any enemy
+                        if (board[col][r] == enemy) { free = false; break; }
+                        if (col > 0 && board[col - 1][r] == enemy) { free = false; break; }
+                        if (col < size - 1 && board[col + 1][r] == enemy) { free = false; break; }
+                    }
+                    if (free) {
+                        // Huge bonus that scales with proximity — unstoppable runner
+                        val += (8 - distToGoal) * 25;
+                    }
+                }
+
+                // --- Defensive wall ---
+                // Reward pieces on the same row forming a line — blocks enemy from slipping through
+                int homeRow = (cell == Mark.R) ? 7 : 0;
+                int distFromHome = Math.abs(row - homeRow);
+                if (distFromHome >= 2 && distFromHome <= 5) {
+                    if (col > 0 && board[col - 1][row] == cell) val += 6;
+                    if (col < size - 1 && board[col + 1][row] == cell) val += 6;
                 }
 
                 score += isPlayer ? val : -val;
             }
         }
 
-        // Material advantage
+        // --- Material ---
         int playerCount = (player == Mark.R) ? redCount : blackCount;
         int opponentCount = (player == Mark.R) ? blackCount : redCount;
-        score += (playerCount - opponentCount) * 20;
+        score += (playerCount - opponentCount) * 30;
+
+        // --- Race pressure ---
+        // If our frontrunner is closer to goal than theirs, push hard
+        if (playerFrontDist < opponentFrontDist) {
+            score += (opponentFrontDist - playerFrontDist) * 20;
+        } else if (opponentFrontDist < playerFrontDist) {
+            // They're ahead — play more defensively (already handled by threat penalties)
+            score -= (playerFrontDist - opponentFrontDist) * 10;
+        }
 
         return score;
     }
@@ -153,22 +203,10 @@ class Board {
         return false;
     }
 
-    // Simple hash: each cell contributes (col * 8 + row) mapped to a unique factor
-    private static long cellHash(int col, int row, Mark mark) {
-        return (long) mark.value() * (col * 8 + row + 1) * 31L;
-    }
-
     public void play(Move m){
-        // Remove old hash contributions, add new ones
-        boardHash -= cellHash(m.getStartCol(), m.getStartRow(), m.getPlayer());
-        boardHash -= cellHash(m.getEndCol(), m.getEndRow(), board[m.getEndCol()][m.getEndRow()]);
-
         m.setTarget(board[m.getEndCol()][m.getEndRow()]);
         board[m.getEndCol()][m.getEndRow()] = m.getPlayer();
         board[m.getStartCol()][m.getStartRow()] = Mark.EMPTY;
-
-        boardHash += cellHash(m.getEndCol(), m.getEndRow(), m.getPlayer());
-        boardHash += cellHash(m.getStartCol(), m.getStartRow(), Mark.EMPTY);
 
         if(m.getTarget() == Mark.B){
             blackCount--;
@@ -178,14 +216,8 @@ class Board {
     }
 
     public void undoMove(Move m) {
-        boardHash -= cellHash(m.getEndCol(), m.getEndRow(), m.getPlayer());
-        boardHash -= cellHash(m.getStartCol(), m.getStartRow(), Mark.EMPTY);
-
         board[m.getEndCol()][m.getEndRow()] = m.getTarget();
         board[m.getStartCol()][m.getStartRow()] = m.getPlayer();
-
-        boardHash += cellHash(m.getStartCol(), m.getStartRow(), m.getPlayer());
-        boardHash += cellHash(m.getEndCol(), m.getEndRow(), m.getTarget());
 
         if(m.getTarget() == Mark.B){
             blackCount++;
@@ -210,15 +242,13 @@ class Board {
     }
 
     public long generateUniqueId() {
-        return boardHash;
-    }
-
-    private void computeHash() {
-        boardHash = 0;
-        for (int col = 0; col < size; col++) {
-            for (int row = 0; row < size; row++) {
-                boardHash += cellHash(col, row, board[col][row]);
+        long id = 0;
+        for (int row = 0; row < size; row++) {
+            long rowPower = (long) Math.pow(31, row);
+            for (int col = 0; col < size; col++) {
+                id += (board[col][row].value() * (long) Math.pow(13, col) * rowPower) % 4611686018427388039L;
             }
         }
+        return id;
     }
 }

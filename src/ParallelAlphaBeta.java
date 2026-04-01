@@ -81,129 +81,44 @@ public class ParallelAlphaBeta {
             exploredNodesCount.incrementAndGet();
         }
 
-        // [BEGIN] Early exit conditions
-        if (board.hasWon(cpuMark)){
-            return Scoring.WIN_SCORE;
-        }
-        if (board.hasWon(opponentMark)){
-            return Scoring.LOSE_SCORE;
-        }
-        // [END] Early exit conditions
-
-        long boardId = board.generateUniqueId();
-        BoardScoreEntry scoreEntry = scoreMap.get(boardId);
-
         if (IS_TIME_UP.get() || Thread.currentThread().isInterrupted()) {
             return 0;
         }
 
-        // [BEING] Reached terminal node
+        // Early exit — win/loss
+        if (board.hasWon(cpuMark)) return Scoring.WIN_SCORE;
+        if (board.hasWon(opponentMark)) return Scoring.LOSE_SCORE;
+
+        // Terminal node — evaluate
         if (localDepth >= targetDepth) {
-            if(scoreEntry != null && scoreEntry.nodeType == BoardScoreEntry.NodeType.TERMINAL) {
-                return scoreEntry.value;
-            }
-            else{
-                int boardValue = board.evaluate(cpuMark, opponentMark);
-
-                scoreMap.put(boardId,
-                        new BoardScoreEntry(boardValue,
-                                BoardScoreEntry.NodeType.TERMINAL,
-                                localDepth + Client.getTurnCount())
-                );
-                //boardKeyMap.put(boardId, new Board(board));
-                return boardValue;
-            }
-        }
-        // [END] Reached terminal node
-
-        // [BEGIN] Core algorithm
-        ArrayList<Move> possibleMoves = null;
-
-        if(!IS_TIME_UP.get()) {
-            possibleMoves = MoveGenerator.getPossibleMoves(board, isMaximizing ? cpuMark : opponentMark);
+            return board.evaluate(cpuMark, opponentMark);
         }
 
-        if(possibleMoves == null || possibleMoves.isEmpty()){
+        // Generate and order moves
+        ArrayList<Move> possibleMoves = MoveGenerator.getPossibleMoves(board, isMaximizing ? cpuMark : opponentMark);
+
+        if (possibleMoves.isEmpty()) {
             return isMaximizing ? Integer.MIN_VALUE + localDepth : Integer.MAX_VALUE - localDepth;
         }
 
         int optimalScore = isMaximizing ? Integer.MIN_VALUE : Integer.MAX_VALUE;
 
-        if (isMaximizing) {
-            // Check if we stored the value and if it is still useful
-            if(scoreEntry != null
-                    && scoreEntry.nodeType == BoardScoreEntry.NodeType.MAX
-                    && scoreEntry.depth >= (targetDepth - localDepth)
-            ) {
-                if(beta <= scoreEntry.value){
-                    return scoreEntry.value;
-                }
-            }
+        for (Move move : possibleMoves) {
+            if (IS_TIME_UP.get()) break;
 
-            for (Move move : possibleMoves) {
-                if (IS_TIME_UP.get()) {
-                    break;
-                }
+            board.play(move);
+            int score = alphaBetaInternal(board, !isMaximizing, localDepth + 1, targetDepth, alpha, beta);
+            board.undoMove(move);
 
-                board.play(move);
-                int score = alphaBetaInternal(board, false, localDepth+1, targetDepth, alpha, beta);
-                board.undoMove(move);
-
+            if (isMaximizing) {
                 optimalScore = Math.max(optimalScore, score);
                 alpha = Math.max(alpha, optimalScore);
-
-                if (beta <= alpha) {
-                    break;
-                }
-            }
-        } else {
-            // Check if we stored the value and if it is still useful
-            if(scoreEntry != null
-                    && scoreEntry.nodeType == BoardScoreEntry.NodeType.MIN
-                    && scoreEntry.depth >= (targetDepth - localDepth)
-            ) {
-                if(scoreEntry.value <= alpha){
-                    return scoreEntry.value;
-                }
-            }
-
-            for (Move move : possibleMoves) {
-                if (IS_TIME_UP.get()) {
-                    break;
-                }
-
-                board.play(move);
-                int score = alphaBetaInternal(board, true, localDepth+1, targetDepth, alpha, beta);
-                board.undoMove(move);
-
+            } else {
                 optimalScore = Math.min(optimalScore, score);
                 beta = Math.min(beta, optimalScore);
-
-                if (beta <= alpha) {
-                    break;
-                }
             }
-        }
-        // [END] Core algorithm
 
-        // Store value in map if we completed exploration of all branches
-        if (!IS_TIME_UP.get()) {
-            scoreMap.put(boardId,
-                    new BoardScoreEntry(optimalScore,
-                            isMaximizing ? BoardScoreEntry.NodeType.MAX : BoardScoreEntry.NodeType.MIN,
-                            targetDepth - localDepth)
-            );
-
-//            if(Client.DEBUG_MODE) {
-//                // Board ID collision test
-//                if (boardKeyMap.containsKey(boardId)) {
-//                    if (!boardKeyMap.get(boardId).equals(board)) {
-//                        collisions.incrementAndGet();
-//                    }
-//                } else {
-//                    boardKeyMap.put(boardId, new Board(board));
-//                }
-//            }
+            if (beta <= alpha) break;
         }
 
         return optimalScore;

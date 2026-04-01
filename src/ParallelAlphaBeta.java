@@ -13,7 +13,7 @@ public class ParallelAlphaBeta {
     //public AtomicInteger collisions = new AtomicInteger(0);
     private final Mark cpuMark;
     private final Mark opponentMark;
-    ConcurrentHashMap<Long, BoardScoreEntry> scoreMap =  new ConcurrentHashMap<>((int)20E6);
+    ConcurrentHashMap<Long, BoardScoreEntry> scoreMap = new ConcurrentHashMap<>(1_000_000);
     //ConcurrentHashMap<Long, Board> boardKeyMap = new ConcurrentHashMap<>((int)20E6);
 
     public ParallelAlphaBeta(int maxThreads, Mark cpuMark, Mark opponentMark, AtomicBoolean isTimeUp) {

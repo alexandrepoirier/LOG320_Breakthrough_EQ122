@@ -4,6 +4,8 @@ class Board {
     private int size;
     private int blackCount = 0;
     private int redCount = 0;
+    private int redOnGoal = 0;
+    private int blackOnGoal = 0;
     private long boardHash = 0;
 
     public static boolean USE_INCREMENTAL_HASH = true;
@@ -30,10 +32,12 @@ class Board {
             if(Integer.parseInt(boardValues[i]) == 2){
                 board[x][y] = Mark.B;
                 blackCount++;
+                if (y == 7) blackOnGoal++;
             }
             else if(Integer.parseInt(boardValues[i]) == 4){
                 board[x][y] = Mark.R;
                 redCount++;
+                if (y == 0) redOnGoal++;
             }
             else{
                 board[x][y] = Mark.EMPTY;
@@ -53,6 +57,8 @@ class Board {
         this.board = new Mark[b.size][b.size];
         this.redCount = b.redCount;
         this.blackCount = b.blackCount;
+        this.redOnGoal = b.redOnGoal;
+        this.blackOnGoal = b.blackOnGoal;
         this.boardHash = b.boardHash;
 
         for (int row = 0; row < b.size; row++) {
@@ -154,26 +160,12 @@ class Board {
     }
     
     public boolean hasWon(Mark player) {
-        if(player == Mark.R){
-            for(int col = 0; col < size; col++){
-                if(board[col][0] == Mark.R){
-                    return true;
-                }
-            }
-
-            return blackCount == 0;
+        if (player == Mark.R) {
+            return redOnGoal > 0 || blackCount == 0;
         }
-
-        if(player == Mark.B){
-            for(int col = 0; col < size; col++){
-                if(board[col][7] == Mark.B){
-                    return true;
-                }
-            }
-
-            return redCount == 0;
+        if (player == Mark.B) {
+            return blackOnGoal > 0 || redCount == 0;
         }
-
         return false;
     }
 
@@ -191,9 +183,14 @@ class Board {
 
         if(m.getTarget() == Mark.B){
             blackCount--;
+            if (m.getEndRow() == 7) blackOnGoal--;
         }else if(m.getTarget() == Mark.R){
             redCount--;
+            if (m.getEndRow() == 0) redOnGoal--;
         }
+
+        if (m.getPlayer() == Mark.R && m.getEndRow() == 0) redOnGoal++;
+        if (m.getPlayer() == Mark.B && m.getEndRow() == 7) blackOnGoal++;
     }
 
     public void undoMove(Move m) {
@@ -203,13 +200,18 @@ class Board {
                     m.getEndCol(), m.getEndRow(), m.getTarget());
         }
 
+        if (m.getPlayer() == Mark.R && m.getEndRow() == 0) redOnGoal--;
+        if (m.getPlayer() == Mark.B && m.getEndRow() == 7) blackOnGoal--;
+
         board[m.getEndCol()][m.getEndRow()] = m.getTarget();
         board[m.getStartCol()][m.getStartRow()] = m.getPlayer();
 
         if(m.getTarget() == Mark.B){
             blackCount++;
+            if (m.getEndRow() == 7) blackOnGoal++;
         }else if(m.getTarget() == Mark.R){
             redCount++;
+            if (m.getEndRow() == 0) redOnGoal++;
         }
     }
 
@@ -220,10 +222,17 @@ class Board {
     public void recount() {
         redCount = 0;
         blackCount = 0;
+        redOnGoal = 0;
+        blackOnGoal = 0;
         for (int i = 0; i < size; i++) {
             for (int j = 0; j < size; j++) {
-                if (board[i][j] == Mark.R) redCount++;
-                else if (board[i][j] == Mark.B) blackCount++;
+                if (board[i][j] == Mark.R) {
+                    redCount++;
+                    if (j == 0) redOnGoal++;
+                } else if (board[i][j] == Mark.B) {
+                    blackCount++;
+                    if (j == 7) blackOnGoal++;
+                }
             }
         }
         boardHash = BoardHash.computeFull(board, size);

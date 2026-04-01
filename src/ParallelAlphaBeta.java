@@ -25,7 +25,6 @@ public class ParallelAlphaBeta {
 
     public ArrayList<Future<Move>> submit(Board board, ArrayList<Move> moves, int targetDepth, int alpha, int beta) {
         exploredNodesCount.set(0);
-        //collisions.set(0);
 
         ArrayList<Future<Move>> futures = new ArrayList<>();
 
@@ -88,7 +87,23 @@ public class ParallelAlphaBeta {
         if (board.hasWon(cpuMark)) return Scoring.WIN_SCORE;
         if (board.hasWon(opponentMark)) return Scoring.LOSE_SCORE;
 
-        if (localDepth >= targetDepth) {
+        int remainingDepth = targetDepth - localDepth;
+
+        // TT lookup
+        long boardId = board.generateUniqueId();
+        BoardScoreEntry entry = scoreMap.get(boardId);
+        if (entry != null && entry.depth >= remainingDepth) {
+            if (entry.nodeType == BoardScoreEntry.NodeType.EXACT) {
+                return entry.value;
+            } else if (entry.nodeType == BoardScoreEntry.NodeType.MAX) {
+                alpha = Math.max(alpha, entry.value);
+            } else if (entry.nodeType == BoardScoreEntry.NodeType.MIN) {
+                beta = Math.min(beta, entry.value);
+            }
+            if (alpha >= beta) return entry.value;
+        }
+
+        if (remainingDepth <= 0) {
             return board.evaluate(cpuMark, opponentMark);
         }
 
@@ -98,6 +113,7 @@ public class ParallelAlphaBeta {
             return isMaximizing ? Integer.MIN_VALUE + localDepth : Integer.MAX_VALUE - localDepth;
         }
 
+        int originalAlpha = alpha;
         int optimalScore = isMaximizing ? Integer.MIN_VALUE : Integer.MAX_VALUE;
 
         for (Move move : possibleMoves) {
@@ -116,6 +132,23 @@ public class ParallelAlphaBeta {
             }
 
             if (beta <= alpha) break;
+        }
+
+        // TT store
+        if (!IS_TIME_UP.get()) {
+            BoardScoreEntry.NodeType type;
+            if (optimalScore <= originalAlpha) {
+                type = BoardScoreEntry.NodeType.MIN;
+            } else if (optimalScore >= beta) {
+                type = BoardScoreEntry.NodeType.MAX;
+            } else {
+                type = BoardScoreEntry.NodeType.EXACT;
+            }
+
+            BoardScoreEntry existing = scoreMap.get(boardId);
+            if (existing == null || remainingDepth >= existing.depth) {
+                scoreMap.put(boardId, new BoardScoreEntry(optimalScore, type, remainingDepth));
+            }
         }
 
         return optimalScore;

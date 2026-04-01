@@ -40,10 +40,8 @@ class CPUPlayer
     public Move getBestMove(Board board){
         IS_TIME_UP.set(false);
         searchStartTime = System.currentTimeMillis();
+        parallelAlphaBeta.scoreMap.clear();
         ArrayList<Move> moves = generateBestMoves(board);
-
-        // not sure this is really needed, on va le garder au cas où
-        //parallelAlphaBeta.cleanupMap();
 
         if(Client.DEBUG_MODE){
             System.out.printf("Took %.2f s to get moves%n", (float)(System.currentTimeMillis() - searchStartTime) / 1000.);

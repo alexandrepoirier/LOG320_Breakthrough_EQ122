@@ -4,6 +4,9 @@ class Board {
     private int size;
     private int blackCount = 0;
     private int redCount = 0;
+    private long boardHash = 0;
+
+    public static boolean USE_INCREMENTAL_HASH = true;
 
     public Board(int n) {
         this.size = n;
@@ -13,6 +16,7 @@ class Board {
                 board[i][j] = Mark.EMPTY;
             }
         }
+        this.boardHash = BoardHash.computeFull(board, size);
     }
 
     public Board(int n, byte[] boardConfig){
@@ -41,6 +45,7 @@ class Board {
                 y++;
             }
         }
+        this.boardHash = BoardHash.computeFull(board, size);
     }
 
     public Board(Board b) {
@@ -48,6 +53,7 @@ class Board {
         this.board = new Mark[b.size][b.size];
         this.redCount = b.redCount;
         this.blackCount = b.blackCount;
+        this.boardHash = b.boardHash;
 
         for (int row = 0; row < b.size; row++) {
             System.arraycopy(b.board[row], 0, board[row], 0, b.size);
@@ -123,18 +129,6 @@ class Board {
                     if (col < size - 1 && board[col + 1][attackRow] == enemy) val += 25;
                 }
 
-                if (distToGoal > 0 && distToGoal <= 4) {
-                    boolean free = true;
-                    for (int r = row + dir; r >= 0 && r < size; r += dir) {
-                        if (board[col][r] == enemy) { free = false; break; }
-                        if (col > 0 && board[col - 1][r] == enemy) { free = false; break; }
-                        if (col < size - 1 && board[col + 1][r] == enemy) { free = false; break; }
-                    }
-                    if (free) {
-                        val += (8 - distToGoal) * 25;
-                    }
-                }
-
                 int homeRow = (cell == Mark.R) ? 7 : 0;
                 int distFromHome = Math.abs(row - homeRow);
                 if (distFromHome >= 2 && distFromHome <= 5) {
@@ -185,6 +179,13 @@ class Board {
 
     public void play(Move m){
         m.setTarget(board[m.getEndCol()][m.getEndRow()]);
+
+        if (USE_INCREMENTAL_HASH) {
+            boardHash = BoardHash.updatePlay(boardHash,
+                    m.getStartCol(), m.getStartRow(), m.getPlayer(),
+                    m.getEndCol(), m.getEndRow(), m.getTarget());
+        }
+
         board[m.getEndCol()][m.getEndRow()] = m.getPlayer();
         board[m.getStartCol()][m.getStartRow()] = Mark.EMPTY;
 
@@ -196,6 +197,12 @@ class Board {
     }
 
     public void undoMove(Move m) {
+        if (USE_INCREMENTAL_HASH) {
+            boardHash = BoardHash.updateUndo(boardHash,
+                    m.getStartCol(), m.getStartRow(), m.getPlayer(),
+                    m.getEndCol(), m.getEndRow(), m.getTarget());
+        }
+
         board[m.getEndCol()][m.getEndRow()] = m.getTarget();
         board[m.getStartCol()][m.getStartRow()] = m.getPlayer();
 
@@ -219,27 +226,13 @@ class Board {
                 else if (board[i][j] == Mark.B) blackCount++;
             }
         }
-    }
-
-    private static final long[] POW13 = new long[8];
-    private static final long[] POW31 = new long[8];
-    private static final long MOD = 4611686018427388039L;
-    static {
-        POW13[0] = 1; POW31[0] = 1;
-        for (int i = 1; i < 8; i++) {
-            POW13[i] = POW13[i - 1] * 13;
-            POW31[i] = POW31[i - 1] * 31;
-        }
+        boardHash = BoardHash.computeFull(board, size);
     }
 
     public long generateUniqueId() {
-        long id = 0;
-        for (int row = 0; row < size; row++) {
-            long rp = POW31[row];
-            for (int col = 0; col < size; col++) {
-                id += (board[col][row].value() * POW13[col] * rp) % MOD;
-            }
+        if (USE_INCREMENTAL_HASH) {
+            return boardHash;
         }
-        return id;
+        return BoardHash.computeFull(board, size);
     }
 }

@@ -60,6 +60,7 @@ public class TestUniqueId {
                     g2[x][y] = g1[x][y];
             g2[c1][r1] = g1[c2][r2];
             g2[c2][r2] = g1[c1][r1];
+            b2.recount();
 
             if (b1.generateUniqueId() == b2.generateUniqueId()) {
                 failures++;
@@ -93,6 +94,7 @@ public class TestUniqueId {
                 for (int y = 0; y < 8; y++)
                     g2[x][y] = g1[x][y];
             g2[col][row] = newMark;
+            b2.recount();
 
             if (b1.generateUniqueId() == b2.generateUniqueId()) {
                 failures++;
@@ -115,6 +117,7 @@ public class TestUniqueId {
                 else if (r == 1) g[i][j] = Mark.B;
                 else g[i][j] = Mark.EMPTY;
             }
+        b.recount();
         return b;
     }
 
